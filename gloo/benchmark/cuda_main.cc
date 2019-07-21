@@ -176,6 +176,7 @@ template <typename T>
 void runBenchmark(options& x) {
   Runner::BenchmarkFn<T> fn;
 
+
   if (x.benchmark == "cuda_broadcast_one_to_all") {
     fn = [&x](std::shared_ptr<Context>& context) {
       return std::unique_ptr<Benchmark<T>>(
@@ -205,8 +206,18 @@ void runBenchmark(options& x) {
       return std::unique_ptr<Benchmark<T>>(
         new CudaAllreduceBenchmark<T, CudaAllreduceRingChunked<T>>(context, x));
     };
+  } else if (x.benchmark == "pcx_all_reduce_ring") {
+    fn = [&x](std::shared_ptr<Context>& context) {
+      return std::unique_ptr<Benchmark<T>>(
+        new CudaAllreduceBenchmark<T, CudaAllreducePcxRing<T>>(context, x));
+    };
+  } else if (x.benchmark == "pcx_all_reduce_king") {
+    fn = [&x](std::shared_ptr<Context>& context) {
+      return std::unique_ptr<Benchmark<T>>(
+        new CudaAllreduceBenchmark<T, CudaAllreducePcxKing<T>>(context, x));
+    };
   }
-
+  
   if (!fn) {
     GLOO_ENFORCE(false, "Invalid algorithm: ", x.benchmark);
   }

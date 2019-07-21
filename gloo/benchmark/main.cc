@@ -13,6 +13,10 @@
 #include "gloo/allreduce_bcube.h"
 #include "gloo/allreduce_ring.h"
 #include "gloo/allreduce_ring_chunked.h"
+
+#include "gloo/pcx_allreduce_king.h"
+#include "gloo/pcx_allreduce_ring.h"
+
 #include "gloo/barrier_all_to_all.h"
 #include "gloo/barrier_all_to_one.h"
 #include "gloo/broadcast_one_to_all.h"
@@ -211,6 +215,16 @@ class ReduceScatterBenchmark : public Benchmark<T> {
       return gloo::make_unique<                                            \
           AllreduceBenchmark<AllreduceRingChunked<T>, T>>(context, x);     \
     };                                                                     \
+  } else if (x.benchmark == "pcx_allreduce_king") {                        \
+    fn = [&](std::shared_ptr<Context>& context) {                          \
+      return gloo::make_unique<                                            \
+          AllreduceBenchmark<PcxAllreduceKing<T>, T>>(context, x);         \
+    };                                                                     \
+  } else if (x.benchmark == "pcx_allreduce_ring") {                        \
+    fn = [&](std::shared_ptr<Context>& context) {                          \
+      return gloo::make_unique<                                            \
+          AllreduceBenchmark<PcxAllreduceRing<T>, T>>(context, x);         \
+    };                                                                     \
   } else if (x.benchmark == "allreduce_halving_doubling") {                \
     fn = [&](std::shared_ptr<Context>& context) {                          \
       return gloo::make_unique<                                            \
@@ -239,7 +253,7 @@ class ReduceScatterBenchmark : public Benchmark<T> {
     };                                                                     \
   } else if (x.benchmark == "reduce_scatter") {                            \
     fn = [&](std::shared_ptr<Context>& context) {                          \
-      return gloo::make_unique<ReduceScatterBenchmark<T>>(context, x);  \
+      return gloo::make_unique<ReduceScatterBenchmark<T>>(context, x);     \
     };                                                                     \
   }                                                                        \
   if (!fn) {                                                               \
@@ -255,7 +269,7 @@ int main(int argc, char** argv) {
   } else if (x.halfPrecision) {
     RUN_BENCHMARK(float16);
   } else {
-    RUN_BENCHMARK(float);
+    RUN_BENCHMARK(int);
   }
   return 0;
 }

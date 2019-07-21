@@ -18,6 +18,10 @@ list(APPEND GLOO_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/reduce.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/scatter.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/types.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/dv_mgr.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/qps.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_mem.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/verbs_ctx.cc"
   )
 
 list(APPEND GLOO_HDRS
@@ -31,6 +35,11 @@ list(APPEND GLOO_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/allreduce_local.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/allreduce_ring.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/allreduce_ring_chunked.h"
+
+
+  "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_king.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_ring.h"
+
   "${CMAKE_CURRENT_SOURCE_DIR}/barrier.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/barrier_all_to_all.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/barrier_all_to_one.h"
@@ -44,6 +53,17 @@ list(APPEND GLOO_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/reduce_scatter.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/scatter.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/types.h"
+
+
+  "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_king.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_ring.h"
+
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/dv_mgr.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/qps.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_mem.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/verbs_ctx.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/udma_barrier.h"
+
   )
 
 if(USE_CUDA)
@@ -78,6 +98,8 @@ add_subdirectory(transport)
 
 # Depend on pthreads for transport device threads
 list(APPEND gloo_DEPENDENCY_LIBS pthread)
+
+##list(APPEND gloo_DEPENDENCY_LIBS mlx5)
 
 # Enable the following to get a list of source files
 if(FALSE)
