@@ -16,6 +16,8 @@
 #include "gloo/cuda_allreduce_halving_doubling.h"
 #include "gloo/cuda_allreduce_halving_doubling_pipelined.h"
 #include "gloo/cuda_allreduce_ring_chunked.h"
+#include "gloo/pcx_allreduce_ring.h"
+#include "gloo/pcx_allreduce_king.h"
 #include "gloo/cuda_broadcast_one_to_all.h"
 #include "gloo/cuda_private.h"
 
@@ -209,12 +211,12 @@ void runBenchmark(options& x) {
   } else if (x.benchmark == "pcx_all_reduce_ring") {
     fn = [&x](std::shared_ptr<Context>& context) {
       return std::unique_ptr<Benchmark<T>>(
-        new CudaAllreduceBenchmark<T, CudaAllreducePcxRing<T>>(context, x));
+        new CudaAllreduceBenchmark<T, PcxAllreduceRing<T>>(context, x));
     };
   } else if (x.benchmark == "pcx_all_reduce_king") {
     fn = [&x](std::shared_ptr<Context>& context) {
       return std::unique_ptr<Benchmark<T>>(
-        new CudaAllreduceBenchmark<T, CudaAllreducePcxKing<T>>(context, x));
+        new CudaAllreduceBenchmark<T, PcxAllreduceKing<T>>(context, x));
     };
   }
   
