@@ -31,15 +31,7 @@ typedef struct mem_registration_ring {
 } mem_registration_ring_t;
 
 int ring_exchange(void *comm, volatile void *send_buf, volatile void *recv_buf,
-                 size_t size, uint32_t peer, uint32_t tag) {
-  std::shared_ptr<Context> *ctx = static_cast<std::shared_ptr<Context> *>(comm);
-  auto &pair = (*ctx)->getPair(peer);
-  auto sendBuf = pair->createSendBuffer(tag, (void *)send_buf, size);
-  auto recvBuf = pair->createRecvBuffer(tag, (void *)recv_buf, size);
-  sendBuf->send();
-  sendBuf->waitSend();
-  recvBuf->waitRecv();
-}
+                 size_t size, uint32_t peer, uint32_t tag);
 
 class step_ctx {
 public:
