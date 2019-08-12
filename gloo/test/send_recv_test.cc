@@ -10,7 +10,6 @@
 
 #include <unordered_set>
 #include <array>
-
 #include <algorithm>
 
 #include "gloo/transport/tcp/unbound_buffer.h"

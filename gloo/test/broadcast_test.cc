@@ -111,17 +111,14 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::ValuesIn(genMemorySizes()),
         ::testing::Values(broadcastOneToAll)));
 
-#if 0
 INSTANTIATE_TEST_CASE_P(
     LargeBroadcast,
     BroadcastTest,
     ::testing::Combine(
         ::testing::Values(2),
         ::testing::Values(1),
-        ::testing::Values(512 * 1024 * 1024),
+        ::testing::Values((size_t)512 * 1024 * 1024),
         ::testing::Values(broadcastOneToAll)));
-
-#endif
 
 using NewParam = std::tuple<int, int, bool, bool>;
 
