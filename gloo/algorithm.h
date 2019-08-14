@@ -27,9 +27,14 @@ class Algorithm {
  protected:
   std::shared_ptr<Context> context_;
 
+  // The rank ID of the process
   const int contextRank_;
+
+  // The size (number of ranks) of the communicator
   const int contextSize_;
 
+  // Returns a pair of two ranks. The first rank in the pair is the
+  // contextRank_, and the other rank is the rank i
   std::unique_ptr<transport::Pair>& getPair(int i);
 
   // Helpers for ring algorithms
@@ -73,6 +78,8 @@ class ReductionFunction {
     return type_;
   }
 
+  // Reduces x and y arrays (each of size n) using fn_ function
+  // and put result into x.
   void call(T* x, const T* y, size_t n) const {
     fn_(x, y, n);
   }

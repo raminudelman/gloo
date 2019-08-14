@@ -18,6 +18,8 @@ list(APPEND GLOO_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/reduce.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/scatter.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/types.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_ring.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_king.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/dv_mgr.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/qps.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_mem.cc"
@@ -36,7 +38,6 @@ list(APPEND GLOO_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/allreduce_ring.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/allreduce_ring_chunked.h"
 
-
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_king.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_ring.h"
 
@@ -53,7 +54,6 @@ list(APPEND GLOO_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/reduce_scatter.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/scatter.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/types.h"
-
 
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_king.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_ring.h"
