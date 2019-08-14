@@ -21,4 +21,4 @@ int ring_exchange(void *comm, volatile void *send_buf, volatile void *recv_buf,
   recvBuf->waitRecv();
 }
 
-}
+} // namespace gloo
