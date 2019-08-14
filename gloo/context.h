@@ -47,7 +47,11 @@ class Context {
  protected:
   std::shared_ptr<transport::Device> device_;
   std::shared_ptr<transport::Context> transportContext_;
+
+  // Holds the next not used Tag (MPI Tag) that can be used
+  // for a collective opeation
   int slot_;
+  
   std::chrono::milliseconds timeout_;
 
 };
