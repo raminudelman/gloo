@@ -30,7 +30,7 @@ class Algorithm {
   // The rank ID of the process
   const int contextRank_;
 
-  // The size (number of ranks) of the communicator
+  // Total number of ranks within the communicators group.
   const int contextSize_;
 
   // Returns a pair of two ranks. The first rank in the pair is the
