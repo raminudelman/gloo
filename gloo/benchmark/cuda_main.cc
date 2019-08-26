@@ -208,12 +208,12 @@ void runBenchmark(options& x) {
       return std::unique_ptr<Benchmark<T>>(
         new CudaAllreduceBenchmark<T, CudaAllreduceRingChunked<T>>(context, x));
     };
-  } else if (x.benchmark == "pcx_all_reduce_ring") {
+  } else if (x.benchmark == "pcx_allreduce_ring") {
     fn = [&x](std::shared_ptr<Context>& context) {
       return std::unique_ptr<Benchmark<T>>(
         new CudaAllreduceBenchmark<T, PcxAllreduceRing<T>>(context, x));
     };
-  } else if (x.benchmark == "pcx_all_reduce_king") {
+  } else if (x.benchmark == "pcx_allreduce_king") {
     fn = [&x](std::shared_ptr<Context>& context) {
       return std::unique_ptr<Benchmark<T>>(
         new CudaAllreduceBenchmark<T, PcxAllreduceKing<T>>(context, x));
