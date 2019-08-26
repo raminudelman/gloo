@@ -17,8 +17,7 @@
 
 #include "gloo/algorithm.h"
 #include "gloo/context.h"
-#include "third-party/pcx/pcx_mem.h"
-#include "third-party/pcx/qps.h"
+#include "gloo/pcx_allreduce_common.h"
 
 #include <ctime>
 #include <vector>
