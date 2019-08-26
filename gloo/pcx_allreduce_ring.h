@@ -164,8 +164,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
   }
 
   void connect_and_prepare() { // TODO: Make this function private
-    // The number of elements to reduce
-    int elements_to_reduce = ptrs_.size();
+    int vectors_to_reduce = ptrs_.size(); 
 
     unsigned step_count = contextSize_;
     unsigned comm_size = contextSize_;
@@ -188,7 +187,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     }
     pipeline_ = step_count*2; // CHECK: What is this?
 
-    for (int i = 0; i < elements_to_reduce; i++) {
+    for (int i = 0; i < vectors_to_reduce; i++) {
       mem_.usr_vec.push_back(new PipeMem((void*)ptrs_[i], pieceSize_, 
                              (size_t)step_count, ibv_));
     }
@@ -224,7 +223,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
     for (unsigned step_idx = 0; step_idx < step_count; step_idx++) {
       size_t piece = (step_count + myRank - step_idx) % step_count;
-      for (int k = 0; k < elements_to_reduce; ++k) {
+      for (int k = 0; k < vectors_to_reduce; ++k) {
         rd_.iters[step_idx].umr_iov.push_back(
           new RefMem((*mem_.usr_vec[k])[piece]));
       }
@@ -242,10 +241,9 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     int credits = pipeline_;
 
     if (credits>1){
-      right->reduce_write(rd_.iters[0].outgoing_buf, 0, elements_to_reduce, MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32);
+      right->reduce_write(rd_.iters[0].outgoing_buf, 0, vectors_to_reduce, MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32);
       --credits;
-    } else {
-      right->reduce_write_cmpl(rd_.iters[0].outgoing_buf, 0, elements_to_reduce, MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32);
+      right->reduce_write_cmpl(rd_.iters[0].outgoing_buf, 0, vectors_to_reduce, MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32);
       sess->wait_send(right);
       left->sendCredit();
       sess->wait(right);
@@ -259,13 +257,13 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
  
     for (unsigned step_idx = 1; step_idx < step_count; step_idx++) {
       if (credits==1){
-        right->reduce_write_cmpl(rd_.iters[step_idx].outgoing_buf, step_idx, (elements_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32); 
+        right->reduce_write_cmpl(rd_.iters[step_idx].outgoing_buf, step_idx, (vectors_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32); 
         sess->wait_send(right);
         left->sendCredit();
         sess->wait(right);
         credits = pipeline_;
       } else {
-        right->reduce_write(rd_.iters[step_idx].outgoing_buf, step_idx, (elements_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32);
+        right->reduce_write(rd_.iters[step_idx].outgoing_buf, step_idx, (vectors_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32);
         --credits;
       }
       sess->wait(left);
@@ -283,7 +281,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
       size_t piece = (step_idx + myRank) % step_count;
       if (credits==1){
         right->writeCmpl(&newVal, step_count + step_idx );
-        for (uint32_t buf_idx = 0; buf_idx < elements_to_reduce; buf_idx++) {
+        for (uint32_t buf_idx = 0; buf_idx < vectors_to_reduce; buf_idx++) {
           lqp->write(&newVal, rd_.iters[step_idx].umr_iov[buf_idx]);
         }
         sess->wait_send(right);
@@ -293,7 +291,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
         credits = pipeline_;
       } else {
         right->write(&newVal, step_count + step_idx);
-        for (uint32_t buf_idx = 0; buf_idx < elements_to_reduce; buf_idx++) {
+        for (uint32_t buf_idx = 0; buf_idx < vectors_to_reduce; buf_idx++) {
           lqp->write(&newVal, rd_.iters[step_idx].umr_iov[buf_idx]);
         }
       }
