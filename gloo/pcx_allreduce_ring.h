@@ -182,14 +182,14 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
   
     // Find the maximal pipeline which devides the communicator
     // size without a reminder
-    while (comm_size % pipeline_) {
+    while (contextSize_ % pipeline_) {
       --pipeline_;
     }
-    pipeline_ = step_count*2; // CHECK: What is this?
+    pipeline_ = contextSize_*2; // TODO: What is this? it overrides the loop that was before!!
 
     for (int i = 0; i < vectors_to_reduce; i++) {
       mem_.usr_vec.push_back(new PipeMem((void*)ptrs_[i], pieceSize_, 
-                             (size_t)step_count, ibv_));
+                             (size_t)contextSize_, ibv_));
     }
 
     int temp_type = PCX_MEMORY_TYPE_MEMIC;
@@ -202,8 +202,8 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     LoopbackQp *lqp = rd_.lqp;
     PCX_RING_PRINT("loopback connected");
 
-    rd_.iters_cnt = step_count;
-    rd_.iters = new StepCtx[step_count];
+    rd_.iters_cnt = contextSize_;
+    rd_.iters = new StepCtx[contextSize_];
     if (!rd_.iters) {
       throw "malloc failed";
     }
@@ -214,7 +214,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     uint32_t slot2 = this->context_->nextSlot();
 
     rd_.pqp = new RingPair(sess, &ring_exchange, (void *)&(this->context_), 
-                           myRank, step_count , slot1 , slot2 , mem_.tmpMem); 
+                           myRank, contextSize_ , slot1 , slot2 , mem_.tmpMem); 
     
     PCX_RING_PRINT("RC ring QPs created");
 
@@ -222,7 +222,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     RingQp* left = rd_.pqp->left;
 
     for (unsigned step_idx = 0; step_idx < step_count; step_idx++) {
-      size_t piece = (step_count + myRank - step_idx) % step_count;
+      size_t piece = (contextSize_ + myRank - step_idx) % contextSize_;
       for (int k = 0; k < vectors_to_reduce; ++k) {
         rd_.iters[step_idx].umr_iov.push_back(
           new RefMem((*mem_.usr_vec[k])[piece]));
