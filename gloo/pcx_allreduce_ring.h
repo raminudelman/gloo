@@ -34,14 +34,16 @@ typedef struct mem_registration_ring { // TODO: Convert into a class and delete 
   // TODO: Add documentation
   Iop usr_vec;  
 
-  //PipeMem *usr_mem; TODO: Not used. Need to remove.
   PipeMem *tmpMem;
 } mem_registration_ring_t;
 
 // Performs data exchange between peers in ring.
 // Sends data of size 'size' to 'peer' from 'send_buf' and 
 // receives data of size 'size' from 'peer' to 'recv_buf'.
-// 
+// This function is used for connecting the QPs of two ranks.
+// After the execution of this function, the ranks will be able to communicate
+// via the two QPs (each rank through it's own QP on it's own end)
+//
 // Args:
 //    comm : Communicator that holds the rank ID of the current rank
 //    peer : Rank ID of the rank that will take part in the data exchange
@@ -61,8 +63,8 @@ public:
     delete(this->outgoing_buf);
     freeIov(umr_iov);
   };
-  Iov umr_iov;
-  NetMem *outgoing_buf;
+  Iov umr_iov; // Iov == Input/Output Vector, UMR is because the user's buffer is not contigious and we convert it to a UMR.
+  NetMem *outgoing_buf;  // The buffer which contains the result of the reduce and which will be sent to the peer rank
 };
 
 typedef struct rd_connections_ring {
@@ -70,8 +72,14 @@ typedef struct rd_connections_ring {
   LoopbackQp *lqp; // lqp stands for "Loopback Queue Pair"
   RingPair   *pqp; // pqp stands for "Pair Queue Pair"
 
+  // Holds the number of iterations that will be executed during the All-Reduce
+  // algorithm
   unsigned iters_cnt;
+
+  // Each element in the array holds all the data structure that the algorithm
+  // operates on during each step of the algorithm.
   StepCtx *iters;
+
 } rd_connections_ring_t;
 
 template <typename T> class PcxAllreduceRing : public Algorithm {
@@ -110,18 +118,17 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     // In case the communicator is of size 1,
     // No need to reduce the ptrs vector, because
     // it's already reduced. The reduced result is
-    // the first element in the vector (ptrs[0])
+    // the first element in the ptrs vector (ptrs[0])
     if (this->contextSize_ == 1) {
       return;
     }
 
     // Step #1: 
-    // Initialize verbs for all to use 
-    PRINT("Starting PcxAllreduceRing");
+    // Initialize verbs context (choose IB device, open PD, etc.)
     ibv_ = VerbCtx::getInstance();
     PCX_RING_PRINT("Verbs context initiated");
 
-    // Step #2&3: 
+    // Step #2 & #3:  // TODO: Improve the comment/documentation
     // Connect to the (recursive-doubling) 
     // iters and pre-post operations 
     connect_and_prepare();
@@ -139,7 +146,6 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
     // Deregister memory
     delete(mem_.tmpMem);
-    PRINT("Freeing UMR and freeing user memory");
     freeIop(mem_.usr_vec);
 
     VerbCtx::remInstance();
@@ -148,6 +154,10 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
   void run() {
     debug_write_input();
     rd_.graph->mqp->qp->db();
+
+    // Calling the rearm after the collective operation started (using the 
+    // DoorBell) makes the rearm process to run in parallel with the 
+    // collective algorithm.
     rd_.graph->mqp->qp->rearm();
 
     int res = 0;
@@ -164,15 +174,20 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
   }
 
   void connect_and_prepare() { // TODO: Make this function private
+    // The number of vectors to reduce.
+    // Each vector has count_ elements.
     int vectors_to_reduce = ptrs_.size(); 
 
+    // step_count holds the number of iterations that the ring algorithm should
+    // perform in reduce-scatter stage, and in all-gather stage.
+    // During reduce-scatter it will perform step_count iterations,
+    // and in all-gather stage it will perform additional step_count iterations.
     unsigned step_count = contextSize_;
-    unsigned comm_size = contextSize_;
 
     VerbCtx *ctx = (this->ibv_);
 
     // Create a single management QP
-    rd_.graph = new CommGraph(ctx); // does lock
+    rd_.graph = new CommGraph(ctx); // locks the mutex in the ctx
     CommGraph *sess = rd_.graph;
     PCX_RING_PRINT("Created management QP");
 
@@ -187,17 +202,20 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     }
     pipeline_ = contextSize_*2; // TODO: What is this? it overrides the loop that was before!!
 
+    // Register (ibv_reg_mr) the users data buffers.
     for (int i = 0; i < vectors_to_reduce; i++) {
       mem_.usr_vec.push_back(new PipeMem((void*)ptrs_[i], pieceSize_, 
                              (size_t)contextSize_, ibv_));
     }
 
     int temp_type = PCX_MEMORY_TYPE_MEMIC;
-    temp_type = PCX_MEMORY_TYPE_HOST; // CHECK: Why is this patch needed? Why MEMIC cannot be used?
+    temp_type = PCX_MEMORY_TYPE_HOST; // CHECK: Why is this patch needed? Why MEMIC cannot be used? MEMIC worked but during debug this code was added to prevent other bugs or compilcations. MEMIC is not that important and did not help performance too much because after some point the MEMIC region is not enought and it wil fall back to host mem anyway.
 
+    // The tmpMem will be used for "incoming" messages from the qps, this buffer is of size pipeline and each element in the buffer is with size peicesize.
     mem_.tmpMem = new PipeMem(pieceSize_, pipeline_, ibv_, temp_type);
 
-    // Create a loopback QP
+    // Create a loopback QP - used for DMA inside the container itself. 
+    // Instead of using MemCpy and CudaMemCopy, the memory is copied via the NIC.
     rd_.lqp = new LoopbackQp(sess);
     LoopbackQp *lqp = rd_.lqp;
     PCX_RING_PRINT("loopback connected");
@@ -221,6 +239,8 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     RingQp* right = rd_.pqp->right;
     RingQp* left = rd_.pqp->left;
 
+    // For every step in the ring algorithm, we create a single umr vector
+    // that combines all the corresponding pieces from the usr_vec.
     for (unsigned step_idx = 0; step_idx < step_count; step_idx++) {
       size_t piece = (contextSize_ + myRank - step_idx) % contextSize_;
       for (int k = 0; k < vectors_to_reduce; ++k) {
@@ -228,7 +248,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
           new RefMem((*mem_.usr_vec[k])[piece]));
       }
       if (step_idx > 0){
-      	rd_.iters[step_idx].umr_iov.push_back(new RefMem(mem_.tmpMem->next()));
+      	rd_.iters[step_idx].umr_iov.push_back(new RefMem(mem_.tmpMem->next())); // The next() operation is cyclic.
       }
       rd_.iters[step_idx].outgoing_buf = new UmrMem(rd_.iters[step_idx].umr_iov, 
                                                     ibv_);
@@ -241,8 +261,13 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     int credits = pipeline_;
 
     if (credits>1){
+      // reduce_write means that we perform reduce and perform RDMA write to the
+      // next rank. The RDMA write will send the outgoing_buf to the incoming 
+      // buffer (wihch is the tmpMem) of the destination rank.
       right->reduce_write(rd_.iters[0].outgoing_buf, 0, vectors_to_reduce, MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32);
       --credits;
+    } else { // Credits == 1
+      // reduce_write_cmpl means that we perform reduce and perform RDMA write to the next rank and require a completion for the RDMA write.
       right->reduce_write_cmpl(rd_.iters[0].outgoing_buf, 0, vectors_to_reduce, MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32);
       sess->wait_send(right);
       left->sendCredit();
@@ -251,16 +276,19 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
       // Initialize number of credits
       credits = pipeline_;
     }
+    // Once a rank sent a message from the sending QP (to the rank to the right), 
+    // the rank knows it should wait for the message from the left QP  the 
     sess->wait(left);
 
-    PCX_RING_PRINT("Performing first reduce in the Reduce-Scatter stage");   
+    PCX_RING_PRINT("Performed first reduce in the Reduce-Scatter stage");   
  
+    // The first reduce (first step in the ring algorithm)
     for (unsigned step_idx = 1; step_idx < step_count; step_idx++) {
       if (credits==1){
         right->reduce_write_cmpl(rd_.iters[step_idx].outgoing_buf, step_idx, (vectors_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32); 
         sess->wait_send(right);
-        left->sendCredit();
-        sess->wait(right);
+        left->sendCredit(); // Notifying the left rank that it can continue sending new data
+        sess->wait(right); // Waiting for the rank from the right to realse a credit that mean that our rank can continue sending the data to the right.
         credits = pipeline_;
       } else {
         right->reduce_write(rd_.iters[step_idx].outgoing_buf, step_idx, (vectors_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32);
@@ -271,21 +299,25 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
     PCX_RING_PRINT("Reduce-Scatter stage done");
 
+    // Done with the AllReduce-Scatter. Every rank has a peice of the final
+    // result stored in it's tmpMem (in one of the slots).
 
-    // Done with the AllReduce-Scatter
+    // Start the All-Gather step!!
     size_t last_frag = (step_count-1);
 
     for (unsigned step_idx = 0; step_idx < step_count; step_idx++) {
-      RefMem newVal((*mem_.tmpMem)[last_frag]);
+      // Ref mem does not alocate new memory...
+      RefMem newVal((*mem_.tmpMem)[last_frag]); // Cyclic pipe...there is wraparound
 
       size_t piece = (step_idx + myRank) % step_count;
       if (credits==1){
         right->writeCmpl(&newVal, step_count + step_idx );
+        // Copying "the reduce result from ptrs[0] to all ptrs[i]"
         for (uint32_t buf_idx = 0; buf_idx < vectors_to_reduce; buf_idx++) {
           lqp->write(&newVal, rd_.iters[step_idx].umr_iov[buf_idx]);
         }
         sess->wait_send(right);
-        sess->wait(lqp);
+        sess->wait(lqp); //Waiting for the receive to finish in the loopback QP
         left->sendCredit();
         sess->wait(right); //for credit
         credits = pipeline_;
@@ -301,12 +333,14 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
     PCX_RING_PRINT("All-Gather stage done");
 
+    // Making the NIC wait for the last credit although the user already got the reduce result from the lpq because in the run, we poll only the lpq.
     if (credits != pipeline_){
       left->sendCredit();
       sess->wait(right);
       PCX_RING_PRINT("Returned all credits to peer");
     }
 
+    rd_.graph->finish(); // unlocks the mutex in the ctx
     PCX_RING_PRINT("Graph building stage done");
 
     PCX_RING_PRINT("connect_and_prepare DONE");
@@ -393,30 +427,65 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
 
  protected:
-  // Vector of elements to reduce.
-  // Initialized in the constructor.
+  // Vector of required elements to reduce. 
+  // Assume ptrs_ vector is of size N.
+  // Each element in the ptrs_ vector is of type T* (pointer to an array).
+  // Every T* element is a pointer to a vector/array with count_ elements.
+  // and every element is of type T.
+  // The ptrs_ vector is initialized in the constructor.
+  //
+  // The ptrs_ vector can be visualized as follows:
+  //
+  //    ptrs[0] , ptrs[1] , ptrs[2] , ... , ptrs[N-1]
+  //
+  // The ptrs_[i] can be visualized as follows (assume I = count_):
+  //
+  //    ptrs[i]:   Ti[0] , Ti[1] , Ti[2] , ... , Ti[count_-1]
+  //
+  // Where every Ti[j] element is an element of type T.
+  // Finally, ptrs_ vector can be visualized as follows:
+  //
+  //   {     ptrs_[0]      },{         ptrs_[1]  },...,{      ptrs_[N-1]       }
+  //    [T0[0],...,T0[I-1]] , [T1[0],...,T1[I-1]] ,..., [TN_1[0],...,TN_1[I-1]]
+  //
+  // The ptrs_ vector can be seen as a matrix with dimentions of ptrs_.size()
+  // raws and count_ columns. Each cell [i][j] in the matrix is of type T.
+  // Each raw in the matrix contains a single element in the ptrs_ vector and 
+  // every column represents the element of type T
+  //
+  // The reduce result can be presented easly via the matrix view.
+  // The reduce operation is performed on the column, meaning for every column j
+  // all the raws 0 to N-1 are reduced and the same result stored in all the 
+  // raws of column j.
   std::vector<T*> ptrs_;
  
-  // Number of elements that will be reduced.
-  // Each element is of type T
-  // Initialized in the constructor.
+  // Number of elements in each element of the ptrs_ vector.
+  // Notice that every element in the ptrs_ vector may be also a vector/array)
+  // that will be reduced.
+  // The count_ variable is initialized in the constructor.
   const int count_;
 
-  // Total amount of bytes of all elements
+  // Total amount of bytes of all elements in a single element in ptrs_ vector.
   // Initialized in the constructor.
+  // For example if a single ptrs_ element is a vector of 5 elements each of
+  // size T, then bytes_ will be equal to 5*size_in_bytes(T).
   const int bytes_;
 
-  // The reduction function to use when performing the reduce 
+  // The reduction function to use when performing the reduce operation.
   // Initialized in the constructor.
   const ReductionFunction<T> *fn_;
 
   VerbCtx *ibv_;
+
   mem_registration_ring_t mem_;
   rd_connections_ring_t rd_;
 
+  // Counts how many times the algorithm ran (for debug reasons). 
   int mone_;
 
-  // TODO: Add documentation. What is this?
+  // Holds the number of data pieces (each peace is of size pieceSize_) 
+  // that a peer rank (in the ring) can send to this rank without waiting for 
+  // the rank to notify that the buffers used to recieve the data can be reused.
   int pipeline_ = RING_PIPELINE_DEPTH; // TODO: Consider converting into 'static constexpr int'
 
   // The size of each chunk that will be moved through
