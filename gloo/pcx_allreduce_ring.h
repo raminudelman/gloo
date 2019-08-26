@@ -22,6 +22,12 @@
 #include <ctime>
 #include <vector>
 
+#ifdef DEBUG
+#define PCX_RING_PRINT(x) fprintf(stderr, "%s\n", x);
+#else
+#define PCX_RING_PRINT(x)
+#endif
+
 namespace gloo {
 
 typedef struct mem_registration_ring { // TODO: Convert into a class and delete from pcx_mem.h all the Iop* functions and typdefs
@@ -99,6 +105,8 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
         pieceSize_(bytes_ / contextSize_),
         fn_(fn) {
 
+    PCX_RING_PRINT("Initializing PcxAllreduceRing");
+
     // In case the communicator is of size 1,
     // No need to reduce the ptrs vector, because
     // it's already reduced. The reduced result is
@@ -111,7 +119,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     // Initialize verbs for all to use 
     PRINT("Starting PcxAllreduceRing");
     ibv_ = VerbCtx::getInstance();
-    PRINT("Verbs initiated");
+    PCX_RING_PRINT("Verbs context initiated");
 
     // Step #2&3: 
     // Connect to the (recursive-doubling) 
@@ -122,6 +130,8 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
   // Destructor
   virtual ~PcxAllreduceRing() {
+    PCX_RING_PRINT("Freeing UMR and freeing user memory");
+
     delete (rd_.lqp);
     delete (rd_.graph);
     delete (rd_.pqp);
@@ -165,7 +175,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     // Create a single management QP
     rd_.graph = new CommGraph(ctx); // does lock
     CommGraph *sess = rd_.graph;
-    PRINT("Created management QP");
+    PCX_RING_PRINT("Created management QP");
 
     // Step #2: Register existing memory buffers with UMR
 
@@ -191,7 +201,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     // Create a loopback QP
     rd_.lqp = new LoopbackQp(sess);
     LoopbackQp *lqp = rd_.lqp;
-    PRINT("loopback connected");
+    PCX_RING_PRINT("loopback connected");
 
     rd_.iters_cnt = step_count;
     rd_.iters = new StepCtx[step_count];
@@ -207,7 +217,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     rd_.pqp = new RingPair(sess, &ring_exchange, (void *)&(this->context_), 
                            myRank, step_count , slot1 , slot2 , mem_.tmpMem); 
     
-    PRINT("RC ring QPs created");
+    PCX_RING_PRINT("RC ring QPs created");
 
     RingQp* right = rd_.pqp->right;
     RingQp* left = rd_.pqp->left;
@@ -224,7 +234,10 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
       rd_.iters[step_idx].outgoing_buf = new UmrMem(rd_.iters[step_idx].umr_iov, 
                                                     ibv_);
     }
-    PRINT("UMR registration done");
+    PCX_RING_PRINT("UMR registration done");
+
+    PCX_RING_PRINT("Starting All-Reduce");
+    PCX_RING_PRINT("Starting Scatter-Reduce stage");
 
     int credits = pipeline_;
 
@@ -242,7 +255,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     }
     sess->wait(left);
 
-    PRINT("initial send");   
+    PCX_RING_PRINT("Performing first reduce in the Reduce-Scatter stage");   
  
     for (unsigned step_idx = 1; step_idx < step_count; step_idx++) {
       if (credits==1){
@@ -258,7 +271,8 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
       sess->wait(left);
     }
 
-    PRINT("reduce-scatter");
+    PCX_RING_PRINT("Reduce-Scatter stage done");
+
 
     // Done with the AllReduce-Scatter
     size_t last_frag = (step_count-1);
@@ -287,17 +301,17 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
       ++last_frag;
     }
 
-    PRINT("allgather");
+    PCX_RING_PRINT("All-Gather stage done");
 
     if (credits != pipeline_){
       left->sendCredit();
       sess->wait(right);
-      PRINT("credit passing");
+      PCX_RING_PRINT("Returned all credits to peer");
     }
 
-    PRINT("Graph building - Done");
-    rd_.graph->finish(); // unlocks
-    PRINT("connect_and_prepare DONE");
+    PCX_RING_PRINT("Graph building stage done");
+
+    PCX_RING_PRINT("connect_and_prepare DONE");
   }
 
   // Debug function // TODO: Make this function private!
