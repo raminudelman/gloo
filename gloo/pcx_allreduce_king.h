@@ -193,26 +193,26 @@ public:
     lqp->reduce_write(mem_.umr_mem, rd_.result, inputs,
                       MLX5DV_VECTOR_CALC_OP_ADD,
                       MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, false);
-    sess->wait(lqp);
+    sess->wait(lqp, false);
     for (step_idx = 0; step_idx < step_count; step_idx++) {
       if (step_idx >= pipeline) {
-        sess->wait(rd_.peers[step_idx].qp);
+        sess->wait(rd_.peers[step_idx].qp, false);
       }
       rd_.peers[step_idx].qp->write(rd_.result, true);
-      sess->wait(rd_.peers[step_idx].qp);
-      sess->wait_send(rd_.peers[step_idx].qp);
+      sess->wait(rd_.peers[step_idx].qp, false);
+      sess->wait(rd_.peers[step_idx].qp, true);
       lqp->reduce_write(rd_.peers[step_idx].outgoing_buf, rd_.result, 2,
                         MLX5DV_VECTOR_CALC_OP_ADD,
                         MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, false);
-      sess->wait(lqp);
+      sess->wait(lqp, false);
       rd_.peers[(step_idx + pipeline) % step_count].qp->send_credit();
     }
     for (uint32_t buf_idx = 0; buf_idx < inputs; buf_idx++) {
       lqp->write(rd_.result, mem_.usr_vec[buf_idx], false);
     }
-    sess->wait(lqp);
+    sess->wait(lqp, false);
     for (step_idx = 0; step_idx < pipeline; step_idx++) {
-      sess->wait(rd_.peers[step_idx].qp);
+      sess->wait(rd_.peers[step_idx].qp, false);
     }
     PRINT("Graph building - Done");
     rd_.graph->finish(); // unlocks

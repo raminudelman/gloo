@@ -271,16 +271,16 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     } else { // Credits == 1
       // reduce_write with 'require_cmpl==true' means that we perform reduce and perform RDMA write to the next rank and require a completion for the RDMA write.
       right->reduce_write(rd_.iters[0].outgoing_buf, 0, vectors_to_reduce, MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, true);
-      sess->wait_send(right);
+      sess->wait(right, true);
       left->send_credit();
-      sess->wait(right);
+      sess->wait(right, false);
 
       // Initialize number of credits
       credits = pipeline_;
     }
     // Once a rank sent a message from the sending QP (to the rank to the right), 
     // the rank knows it should wait for the message from the left QP  the 
-    sess->wait(left);
+    sess->wait(left, false);
 
     PCX_RING_PRINT("Performed first reduce in the Reduce-Scatter stage \n");   
  
@@ -288,15 +288,15 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     for (unsigned step_idx = 1; step_idx < step_count; step_idx++) {
       if (credits==1){
         right->reduce_write(rd_.iters[step_idx].outgoing_buf, step_idx, (vectors_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, true); 
-        sess->wait_send(right);
+        sess->wait(right, true);
         left->send_credit(); // Notifying the left rank that it can continue sending new data
-        sess->wait(right); // Waiting for the rank from the right to realse a credit that mean that our rank can continue sending the data to the right.
+        sess->wait(right, false); // Waiting for the rank from the right to realse a credit that mean that our rank can continue sending the data to the right.
         credits = pipeline_;
       } else {
         right->reduce_write(rd_.iters[step_idx].outgoing_buf, step_idx, (vectors_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, false);
         --credits;
       }
-      sess->wait(left);
+      sess->wait(left, false);
     }
 
     PCX_RING_PRINT("Reduce-Scatter stage done \n");
@@ -318,7 +318,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
         for (uint32_t buf_idx = 0; buf_idx < vectors_to_reduce; buf_idx++) {
           lqp->write(&newVal, rd_.iters[step_idx].umr_iov[buf_idx], false);
         }
-        sess->wait_send(right);
+        sess->wait(right, true);
         sess->wait(lqp); //Waiting for the receive to finish in the loopback QP
         left->send_credit();
         sess->wait(right); //for credit
@@ -329,7 +329,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
           lqp->write(&newVal, rd_.iters[step_idx].umr_iov[buf_idx], false);
         }
       }
-      sess->wait(left); //for data
+      sess->wait(left, false); //for data
       ++last_frag;
     }
 
