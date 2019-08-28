@@ -21,10 +21,12 @@
 #include <ctime>
 #include <vector>
 
+#define DEBUG
 #ifdef DEBUG
-#define PCX_RING_PRINT(x) fprintf(stderr, "%s\n", x);
+#define PCX_RING_PRINT(args...) fprintf(stderr, "(%s: %d) in function %s: " \
+                       ,__FILE__,__LINE__,__func__); fprintf(stderr, args)
 #else
-#define PCX_RING_PRINT(x)
+#define PCX_RING_PRINT(args...)
 #endif
 
 namespace gloo {
@@ -112,7 +114,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
         pieceSize_(bytes_ / contextSize_),
         fn_(fn) {
 
-    PCX_RING_PRINT("Initializing PcxAllreduceRing");
+    PCX_RING_PRINT("Initializing PcxAllreduceRing \n");
 
     // In case the communicator is of size 1,
     // No need to reduce the ptrs vector, because
@@ -124,8 +126,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
     // Step #1: 
     // Initialize verbs context (choose IB device, open PD, etc.)
-    ibv_ = VerbCtx::getInstance();
-    PCX_RING_PRINT("Verbs context initiated");
+    PCX_RING_PRINT("Verbs context initiated \n");
 
     // Step #2 & #3:  // TODO: Improve the comment/documentation
     // Connect to the (recursive-doubling) 
@@ -136,7 +137,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
   // Destructor
   virtual ~PcxAllreduceRing() {
-    PCX_RING_PRINT("Freeing UMR and freeing user memory");
+    PCX_RING_PRINT("Freeing UMR and freeing user memory \n");
 
     delete (rd_.lqp);
     delete (rd_.graph);
@@ -188,7 +189,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     // Create a single management QP
     rd_.graph = new CommGraph(ctx); // locks the mutex in the ctx
     CommGraph *sess = rd_.graph;
-    PCX_RING_PRINT("Created management QP");
+    PCX_RING_PRINT("Created management QP \n");
 
     // Step #2: Register existing memory buffers with UMR
 
@@ -217,7 +218,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     // Instead of using MemCpy and CudaMemCopy, the memory is copied via the NIC.
     rd_.lqp = new LoopbackQp(sess);
     LoopbackQp *lqp = rd_.lqp;
-    PCX_RING_PRINT("loopback connected");
+    PCX_RING_PRINT("Loopback created \n");
 
     rd_.iters_cnt = contextSize_;
     rd_.iters = new StepCtx[contextSize_];
@@ -232,7 +233,8 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
     rd_.pqp = new RingPair(sess, &ring_exchange, (void *)&(this->context_), 
                            myRank, contextSize_ , slot1 , slot2 , mem_.tmpMem); 
-    
+    PCX_RING_PRINT("RC ring QPs created \n");
+
     PCX_RING_PRINT("RC ring QPs created");
 
     RingQp* right = rd_.pqp->right;
@@ -252,10 +254,11 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
       rd_.iters[step_idx].outgoing_buf = new UmrMem(rd_.iters[step_idx].umr_iov, 
                                                     ibv_);
     }
-    PCX_RING_PRINT("UMR registration done");
+    PCX_RING_PRINT("UMR registration done \n");
 
-    PCX_RING_PRINT("Starting All-Reduce");
-    PCX_RING_PRINT("Starting Scatter-Reduce stage");
+
+    PCX_RING_PRINT("Starting All-Reduce \n");
+    PCX_RING_PRINT("Starting Scatter-Reduce stage \n");
 
     int credits = pipeline_;
 
@@ -279,7 +282,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     // the rank knows it should wait for the message from the left QP  the 
     sess->wait(left);
 
-    PCX_RING_PRINT("Performed first reduce in the Reduce-Scatter stage");   
+    PCX_RING_PRINT("Performed first reduce in the Reduce-Scatter stage \n");   
  
     // The first reduce (first step in the ring algorithm)
     for (unsigned step_idx = 1; step_idx < step_count; step_idx++) {
@@ -296,7 +299,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
       sess->wait(left);
     }
 
-    PCX_RING_PRINT("Reduce-Scatter stage done");
+    PCX_RING_PRINT("Reduce-Scatter stage done \n");
 
     // Done with the AllReduce-Scatter. Every rank has a peice of the final
     // result stored in it's tmpMem (in one of the slots).
@@ -330,19 +333,19 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
       ++last_frag;
     }
 
-    PCX_RING_PRINT("All-Gather stage done");
+    PCX_RING_PRINT("All-Gather stage done \n");
 
     // Making the NIC wait for the last credit although the user already got the reduce result from the lpq because in the run, we poll only the lpq.
     if (credits != pipeline_){
       left->sendCredit();
       sess->wait(right);
-      PCX_RING_PRINT("Returned all credits to peer");
+      PCX_RING_PRINT("Returned all credits to peer \n");
     }
 
     rd_.graph->finish(); // unlocks the mutex in the ctx
-    PCX_RING_PRINT("Graph building stage done");
+    PCX_RING_PRINT("Graph building stage done \n");
 
-    PCX_RING_PRINT("connect_and_prepare DONE");
+    PCX_RING_PRINT("connect_and_prepare DONE \n");
   }
 
   // Debug function // TODO: Make this function private!
