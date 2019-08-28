@@ -126,6 +126,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
     // Step #1: 
     // Initialize verbs context (choose IB device, open PD, etc.)
+    ibv_ctx_ = VerbCtx::getInstance();
     PCX_RING_PRINT("Verbs context initiated \n");
 
     // Step #2 & #3:  // TODO: Improve the comment/documentation
@@ -184,14 +185,21 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     // and in all-gather stage it will perform additional step_count iterations.
     unsigned step_count = contextSize_;
 
-    VerbCtx *ctx = (this->ibv_);
-
     // Create a single management QP
-    rd_.graph = new CommGraph(ctx); // locks the mutex in the ctx
+    rd_.graph = new CommGraph(ibv_ctx_); // locks the mutex in the ctx
     CommGraph *sess = rd_.graph;
     PCX_RING_PRINT("Created management QP \n");
 
     // Step #2: Register existing memory buffers with UMR
+
+    // Register (ibv_reg_mr) the users data buffers.
+    for (int i = 0; i < vectors_to_reduce; i++) {
+      mem_.usr_vec.push_back(new PipeMem((void*)ptrs_[i], pieceSize_, 
+                             (size_t)contextSize_, ibv_ctx_));
+    }
+
+    int temp_type = PCX_MEMORY_TYPE_MEMIC;
+    temp_type = PCX_MEMORY_TYPE_HOST; // CHECK: Why is this patch needed? Why MEMIC cannot be used? MEMIC worked but during debug this code was added to prevent other bugs or compilcations. MEMIC is not that important and did not help performance too much because after some point the MEMIC region is not enought and it wil fall back to host mem anyway.
 
     pipeline_ = RING_PIPELINE_DEPTH;
   
@@ -202,17 +210,8 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     }
     pipeline_ = contextSize_*2; // TODO: What is this? it overrides the loop that was before!!
 
-    // Register (ibv_reg_mr) the users data buffers.
-    for (int i = 0; i < vectors_to_reduce; i++) {
-      mem_.usr_vec.push_back(new PipeMem((void*)ptrs_[i], pieceSize_, 
-                             (size_t)contextSize_, ibv_));
-    }
-
-    int temp_type = PCX_MEMORY_TYPE_MEMIC;
-    temp_type = PCX_MEMORY_TYPE_HOST; // CHECK: Why is this patch needed? Why MEMIC cannot be used? MEMIC worked but during debug this code was added to prevent other bugs or compilcations. MEMIC is not that important and did not help performance too much because after some point the MEMIC region is not enought and it wil fall back to host mem anyway.
-
     // The tmpMem will be used for "incoming" messages from the qps, this buffer is of size pipeline and each element in the buffer is with size peicesize.
-    mem_.tmpMem = new PipeMem(pieceSize_, pipeline_, ibv_, temp_type);
+    mem_.tmpMem = new PipeMem(pieceSize_, pipeline_, ibv_ctx_, temp_type);
 
     // Create a loopback QP - used for DMA inside the container itself. 
     // Instead of using MemCpy and CudaMemCopy, the memory is copied via the NIC.
@@ -220,13 +219,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     LoopbackQp *lqp = rd_.lqp;
     PCX_RING_PRINT("Loopback created \n");
 
-    rd_.iters_cnt = contextSize_;
-    rd_.iters = new StepCtx[contextSize_];
-    if (!rd_.iters) {
-      throw "malloc failed";
-    }
-
-    /* Establish a connection with each peer */
+    // Establish a connection with each peer
     uint32_t myRank = contextRank_;
     uint32_t slot1 = this->context_->nextSlot();
     uint32_t slot2 = this->context_->nextSlot();
@@ -235,10 +228,14 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
                            myRank, contextSize_ , slot1 , slot2 , mem_.tmpMem); 
     PCX_RING_PRINT("RC ring QPs created \n");
 
-    PCX_RING_PRINT("RC ring QPs created");
-
-    RingQp* right = rd_.pqp->right;
-    RingQp* left = rd_.pqp->left;
+    // Allocating a data structure for every step in the algorithm.
+    // The data structure will hold all the required data buffers for the
+    // step in the algorithm
+    rd_.iters_cnt = contextSize_;
+    rd_.iters = new StepCtx[contextSize_];
+    if (!rd_.iters) {
+      throw "malloc failed";
+    }
 
     // For every step in the ring algorithm, we create a single umr vector
     // that combines all the corresponding pieces from the usr_vec.
@@ -252,10 +249,13 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
       	rd_.iters[step_idx].umr_iov.push_back(new RefMem(mem_.tmpMem->next())); // The next() operation is cyclic.
       }
       rd_.iters[step_idx].outgoing_buf = new UmrMem(rd_.iters[step_idx].umr_iov, 
-                                                    ibv_);
+                                                    ibv_ctx_);
     }
     PCX_RING_PRINT("UMR registration done \n");
 
+    // For convenience, we will define local variables
+    RingQp* right = rd_.pqp->right;
+    RingQp* left = rd_.pqp->left;
 
     PCX_RING_PRINT("Starting All-Reduce \n");
     PCX_RING_PRINT("Starting Scatter-Reduce stage \n");
@@ -477,7 +477,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
   // Initialized in the constructor.
   const ReductionFunction<T> *fn_;
 
-  VerbCtx *ibv_;
+  VerbCtx *ibv_ctx_;
 
   mem_registration_ring_t mem_;
   rd_connections_ring_t rd_;
