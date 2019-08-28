@@ -272,7 +272,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
       // reduce_write_cmpl means that we perform reduce and perform RDMA write to the next rank and require a completion for the RDMA write.
       right->reduce_write_cmpl(rd_.iters[0].outgoing_buf, 0, vectors_to_reduce, MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32);
       sess->wait_send(right);
-      left->sendCredit();
+      left->send_credit();
       sess->wait(right);
 
       // Initialize number of credits
@@ -289,7 +289,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
       if (credits==1){
         right->reduce_write_cmpl(rd_.iters[step_idx].outgoing_buf, step_idx, (vectors_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32); 
         sess->wait_send(right);
-        left->sendCredit(); // Notifying the left rank that it can continue sending new data
+        left->send_credit(); // Notifying the left rank that it can continue sending new data
         sess->wait(right); // Waiting for the rank from the right to realse a credit that mean that our rank can continue sending the data to the right.
         credits = pipeline_;
       } else {
@@ -313,14 +313,14 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
       size_t piece = (step_idx + myRank) % step_count;
       if (credits==1){
-        right->writeCmpl(&newVal, step_count + step_idx );
+        right->write_cmpl(&newVal, step_count + step_idx );
         // Copying "the reduce result from ptrs[0] to all ptrs[i]"
         for (uint32_t buf_idx = 0; buf_idx < vectors_to_reduce; buf_idx++) {
           lqp->write(&newVal, rd_.iters[step_idx].umr_iov[buf_idx]);
         }
         sess->wait_send(right);
         sess->wait(lqp); //Waiting for the receive to finish in the loopback QP
-        left->sendCredit();
+        left->send_credit();
         sess->wait(right); //for credit
         credits = pipeline_;
       } else {
@@ -337,7 +337,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
     // Making the NIC wait for the last credit although the user already got the reduce result from the lpq because in the run, we poll only the lpq.
     if (credits != pipeline_){
-      left->sendCredit();
+      left->send_credit();
       sess->wait(right);
       PCX_RING_PRINT("Returned all credits to peer \n");
     }

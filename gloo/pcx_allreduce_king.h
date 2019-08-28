@@ -198,14 +198,14 @@ public:
       if (step_idx >= pipeline) {
         sess->wait(rd_.peers[step_idx].qp);
       }
-      rd_.peers[step_idx].qp->writeCmpl(rd_.result);
+      rd_.peers[step_idx].qp->write_cmpl(rd_.result);
       sess->wait(rd_.peers[step_idx].qp);
       sess->wait_send(rd_.peers[step_idx].qp);
       lqp->reduce_write(rd_.peers[step_idx].outgoing_buf, rd_.result, 2,
                         MLX5DV_VECTOR_CALC_OP_ADD,
                         MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32);
       sess->wait(lqp);
-      rd_.peers[(step_idx + pipeline) % step_count].qp->sendCredit();
+      rd_.peers[(step_idx + pipeline) % step_count].qp->send_credit();
     }
     for (uint32_t buf_idx = 0; buf_idx < inputs; buf_idx++) {
       lqp->write(rd_.result, mem_.usr_vec[buf_idx]);
