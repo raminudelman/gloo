@@ -154,7 +154,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
   void run() {
     debug_write_input();
-    rd_.graph->mqp->qp->db();
+    rd_.graph->mqp->qp->db(); // TODO: graph has db() API function. Use it! mpq should not be accessed!
 
     // Calling the rearm after the collective operation started (using the 
     // DoorBell) makes the rearm process to run in parallel with the 
