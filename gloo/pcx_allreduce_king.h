@@ -22,6 +22,13 @@
 #include <ctime>
 #include <vector>
 
+#ifdef DEBUG
+#define PCX_KING_PRINT(args...) fprintf(stderr, "(%s: %d) in function %s [%d]: " \
+                       ,__FILE__,__LINE__,__func__, contextRank_); fprintf(stderr, args)
+#else
+#define PCX_KING_PRINT(args...)
+#endif
+
 namespace gloo {
 
 typedef struct mem_registration {
@@ -69,9 +76,9 @@ public:
     }
 
     /* Step #1: Initialize verbs for all to use */
-    PRINT("starting PcxAllreduceKing");
+    PCX_KING_PRINT("starting PcxAllreduceKing \n");
     ibv_ = VerbCtx::getInstance();
-    PRINT("Verbs initiated");
+    PCX_KING_PRINT("Verbs initiated \n");
     /* Step #2&3: Connect to the (recursive-doubling) peers and pre-post
      * operations */
     connect_and_prepare();
@@ -86,10 +93,15 @@ public:
   }
 
   void run() {
-    //PRINT("allreduce started");
+    PCX_KING_PRINT("King allreduce started \n");
     debug_write_input();
     rd_.graph->mqp->qp->db();
+
+    PCX_KING_PRINT("Sent Doorbell to Management QP \n");
+
     rd_.graph->mqp->qp->rearm();
+
+    PCX_KING_PRINT("Sent Rearm command to Management QP \n");
     int res = 0;
     uint64_t count = 0;
     while (!res) {
@@ -99,7 +111,7 @@ public:
     }
     debug_check_output();
     ++mone;
-    //PRINT("allreduce done"); 
+    PCX_KING_PRINT("Done running PcxKingAllReduce \n");
   }
 
   void register_memory() {
@@ -146,6 +158,8 @@ public:
     while ((1 << ++step_count) < contextSize_)
       ;
 
+    PCX_KING_PRINT("step_count=%d \n", step_count);
+
     VerbCtx *ctx = (this->ibv_);
     // std::lock_guard<std::mutex> lock(ctx->m_);
 
@@ -154,13 +168,15 @@ public:
     CommGraph *sess = rd_.graph;
     PRINT("created MGMT QP");
 
+    PCX_KING_PRINT("Created Management QP \n");
+
     /* Step #2: Register existing memory buffers with UMR */
     register_memory();
 
     /* Create a loopback QP */
     rd_.lqp = new LoopbackQp(sess);
     LoopbackQp *lqp = rd_.lqp;
-    PRINT("loopback connected");
+    PCX_KING_PRINT("Created Loopback QP \n");
 
     rd_.result = new HostMem(bytes_, ibv_);
 
@@ -215,7 +231,7 @@ public:
       sess->wait(rd_.peers[step_idx].qp, false);
     }
     PRINT("Graph building - Done");
-    rd_.graph->finish(); // unlocks
+    PCX_KING_PRINT("connect_and_prepare DONE \n");
   }
 
   void teardown() {
