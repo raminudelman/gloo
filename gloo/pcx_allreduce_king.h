@@ -249,14 +249,15 @@ public:
     if (count == 1000000000) {
       fprintf(stderr, "iteration: %d\n", mone);
       fprintf(stderr, "poll cnt: %d\n", rd_.lqp->qp->get_poll_cnt());
-      fprintf(stderr, "managment qp:");
+      fprintf(stderr, "management qp: \n");
       rd_.graph->mqp->print();
-      fprintf(stderr, "loopback qp:");
+      fprintf(stderr, "loopback qp: \n");
       rd_.lqp->print();
       for (int k = 0; k < step_count; ++k) {
-        fprintf(stderr, "rc qp %d:", k);
+        fprintf(stderr, "rc qp %d: \n", k);
         rd_.peers[k].qp->print();
       }
+      fprintf(stderr, "\n\n\n");
     }
 
 #endif
