@@ -164,11 +164,13 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     int res = 0;
     uint64_t count = 0;
 
-    while (!res) {
+    while (res == 0) {
       res = rd_.lqp->qp->poll();
 
       ++count;
-      debug_hang_report(count);
+      if (contextRank_ == 0) {
+        debug_hang_report(count);
+      }
     }
     debug_check_output();
     ++mone_;
