@@ -30,6 +30,38 @@
 
 namespace gloo {
 
+class RingPair { // TODO: Move to new file pcx_ring.h
+public:
+  RingPair(CommGraph *cgraph, p2p_exchange_func func, void *comm, // TODO: Move to some "ring algorithms qps" file
+                     uint32_t myRank, uint32_t commSize, uint32_t tag1,
+                     uint32_t tag2, PipeMem *incoming, VerbCtx *ctx) {
+    uint32_t rightRank = (myRank + 1) % commSize;
+    uint32_t leftRank = (myRank - 1 + commSize) % commSize;
+  
+    if (myRank % 2) { // Odd rank
+      this->right = new RingQp(ctx, func, comm, rightRank, tag1, incoming);
+      cgraph->regQp(this->right);
+      this->left = new RingQp(ctx, func, comm, leftRank, tag2, incoming);
+      cgraph->regQp(this->left);
+    } else { // Even rank
+      this->left = new RingQp(ctx, func, comm, leftRank, tag1, incoming);
+      cgraph->regQp(this->left);
+      this->right = new RingQp(ctx, func, comm, rightRank, tag2, incoming);
+      cgraph->regQp(this->right);
+    }
+    right->set_pair(left);
+    left->set_pair(right);
+  }
+  
+  ~RingPair() {
+    delete (right);
+    delete (left);
+  }
+
+  RingQp *right;
+  RingQp *left;
+};
+
 typedef struct mem_registration_ring { // TODO: Convert into a class and delete from pcx_mem.h all the Iop* functions and typdefs
   // TODO: Add documentation
   Iop usr_vec;  
@@ -69,6 +101,8 @@ public:
 
 typedef struct rd_connections_ring {
   CommGraph *graph;
+
+  ManagementQp *mqp; // mqp stands for "Management Queue Pair"
   LoopbackQp *lqp; // lqp stands for "Loopback Queue Pair"
   RingPair   *pqp; // pqp stands for "Pair Queue Pair"
 
@@ -139,6 +173,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
   virtual ~PcxAllreduceRing() {
     PCX_RING_PRINT("Freeing UMR and freeing user memory \n");
 
+    delete (rd_.mqp);
     delete (rd_.lqp);
     delete (rd_.graph);
     delete (rd_.pqp);
@@ -173,6 +208,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     }
     debug_check_output();
     ++mone_;
+    PCX_RING_PRINT("[%d] Done running PcxRingAllReduce \n", contextRank_);
   }
 
   void connect_and_prepare() { // TODO: Make this function private
@@ -186,9 +222,19 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     // and in all-gather stage it will perform additional step_count iterations.
     unsigned step_count = contextSize_;
 
-    // Create a single management QP
-    rd_.graph = new CommGraph(ibv_ctx_); // locks the mutex in the ctx
+    // First we lock the verbs context so not other thread will be able to 
+    // access it until we finish the whole "graph building" process.
+    // The lock should be released after the whole graph was built and
+    // "finalized".
+    ibv_ctx_->mtx.lock();
+
+    rd_.graph = new CommGraph(ibv_ctx_); 
     CommGraph *sess = rd_.graph;
+    
+    // Create a single management QP
+    rd_.mqp = new ManagementQp(ibv_ctx_);
+    sess->regQp(rd_.mqp);
+    
     PCX_RING_PRINT("Created management QP \n");
 
     // Step #2: Register existing memory buffers with UMR
@@ -216,7 +262,8 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
     // Create a loopback QP - used for DMA inside the container itself. 
     // Instead of using MemCpy and CudaMemCopy, the memory is copied via the NIC.
-    rd_.lqp = new LoopbackQp(sess);
+    rd_.lqp = new LoopbackQp(ibv_ctx_);
+    sess->regQp(rd_.lqp);
     LoopbackQp *lqp = rd_.lqp;
     PCX_RING_PRINT("Loopback created \n");
 
@@ -226,7 +273,7 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     uint32_t slot2 = this->context_->nextSlot();
 
     rd_.pqp = new RingPair(sess, &ring_exchange, (void *)&(this->context_), 
-                           myRank, contextSize_ , slot1 , slot2 , mem_.tmpMem); 
+                           myRank, contextSize_ , slot1 , slot2 , mem_.tmpMem, ibv_ctx_); 
     PCX_RING_PRINT("RC ring QPs created \n");
 
     // Allocating a data structure for every step in the algorithm.
@@ -267,13 +314,13 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
       // reduce_write with 'require_cmpl==false' means that we perform reduce and perform RDMA write to the
       // next rank. The RDMA write will send the outgoing_buf to the incoming 
       // buffer (wihch is the tmpMem) of the destination rank.
-      right->reduce_write(rd_.iters[0].outgoing_buf, 0, vectors_to_reduce, MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, false);
+      sess->reduce_write(right, rd_.iters[0].outgoing_buf, 0, vectors_to_reduce, MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, false);
       --credits;
     } else { // Credits == 1
       // reduce_write with 'require_cmpl==true' means that we perform reduce and perform RDMA write to the next rank and require a completion for the RDMA write.
-      right->reduce_write(rd_.iters[0].outgoing_buf, 0, vectors_to_reduce, MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, true);
+      sess->reduce_write(right, rd_.iters[0].outgoing_buf, 0, vectors_to_reduce, MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, true);
       sess->wait(right, true);
-      left->send_credit();
+      sess->send_credit(left);
       sess->wait(right, false);
 
       // Initialize number of credits
@@ -288,13 +335,13 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
     // The first reduce (first step in the ring algorithm)
     for (unsigned step_idx = 1; step_idx < step_count; step_idx++) {
       if (credits==1){
-        right->reduce_write(rd_.iters[step_idx].outgoing_buf, step_idx, (vectors_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, true); 
+        sess->reduce_write(right, rd_.iters[step_idx].outgoing_buf, step_idx, (vectors_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, true); 
         sess->wait(right, true);
-        left->send_credit(); // Notifying the left rank that it can continue sending new data
+        sess->send_credit(left); // Notifying the left rank that it can continue sending new data
         sess->wait(right, false); // Waiting for the rank from the right to realse a credit that mean that our rank can continue sending the data to the right.
         credits = pipeline_;
       } else {
-        right->reduce_write(rd_.iters[step_idx].outgoing_buf, step_idx, (vectors_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, false);
+        sess->reduce_write(right, rd_.iters[step_idx].outgoing_buf, step_idx, (vectors_to_reduce+1) , MLX5DV_VECTOR_CALC_OP_ADD, MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, false);
         --credits;
       }
       sess->wait(left, false);
@@ -314,20 +361,20 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
       size_t piece = (step_idx + myRank) % step_count;
       if (credits==1){
-        right->write(&newVal, step_count + step_idx, true);
+        sess->write(right, &newVal, step_count + step_idx, true);
         // Copying "the reduce result from ptrs[0] to all ptrs[i]"
         for (uint32_t buf_idx = 0; buf_idx < vectors_to_reduce; buf_idx++) {
-          lqp->write(&newVal, rd_.iters[step_idx].umr_iov[buf_idx], false);
+          sess->write(lqp, &newVal, rd_.iters[step_idx].umr_iov[buf_idx], false);
         }
         sess->wait(right, true);
         sess->wait(lqp); //Waiting for the receive to finish in the loopback QP
-        left->send_credit();
+        sess->send_credit(left);
         sess->wait(right); //for credit
         credits = pipeline_;
       } else {
-        right->write(&newVal, step_count + step_idx, false);
+        sess->write(right, &newVal, step_count + step_idx, false);
         for (uint32_t buf_idx = 0; buf_idx < vectors_to_reduce; buf_idx++) {
-          lqp->write(&newVal, rd_.iters[step_idx].umr_iov[buf_idx], false);
+          sess->write(lqp, &newVal, rd_.iters[step_idx].umr_iov[buf_idx], false);
         }
       }
       sess->wait(left, false); //for data
@@ -338,12 +385,15 @@ template <typename T> class PcxAllreduceRing : public Algorithm {
 
     // Making the NIC wait for the last credit although the user already got the reduce result from the lpq because in the run, we poll only the lpq.
     if (credits != pipeline_){
-      left->send_credit();
+      sess->send_credit(left);
       sess->wait(right);
       PCX_RING_PRINT("Returned all credits to peer \n");
     }
 
-    rd_.graph->finish(); // unlocks the mutex in the ctx
+    sess->finish();
+
+    ibv_ctx_->mtx.unlock();
+
     PCX_RING_PRINT("Graph building stage done \n");
 
     PCX_RING_PRINT("connect_and_prepare DONE \n");

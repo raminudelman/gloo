@@ -58,10 +58,11 @@ typedef struct rd_connections {
   NetMem *result;
 
   CommGraph *graph;
+  ManagementQp *mqp; // mqp stands for "Management Queue Pair"
   LoopbackQp *lqp;
 
   unsigned peers_cnt;
-  rd_peer_t *peers;
+  rd_peer_t *peers; // Pointer to array of rd_peer_t
 } rd_connections_t;
 
 template <typename T> class PcxAllreduceKing : public Algorithm {
@@ -82,7 +83,6 @@ public:
     /* Step #2&3: Connect to the (recursive-doubling) peers and pre-post
      * operations */
     connect_and_prepare();
-    PRINT("connect_and_prepare DONE");
     mone = 0;
   }
 
@@ -113,7 +113,7 @@ public:
     }
     debug_check_output();
     ++mone;
-    PCX_KING_PRINT("Done running PcxKingAllReduce \n");
+    PCX_KING_PRINT("[%d] Done running PcxRingAllReduce \n", contextRank_);
   }
 
   void register_memory() {
@@ -165,18 +165,24 @@ public:
     VerbCtx *ctx = (this->ibv_);
     // std::lock_guard<std::mutex> lock(ctx->m_);
 
-    /* Create a single management QP */
-    rd_.graph = new CommGraph(ctx); // does lock
-    CommGraph *sess = rd_.graph;
-    PRINT("created MGMT QP");
+    PCX_KING_PRINT("Locking the IB verbs context mtx \n");
+    this->ibv_->mtx.lock();
 
+    rd_.graph = new CommGraph(ctx);
+    CommGraph *sess = rd_.graph;
+
+    // Create a single management QP
+    rd_.mqp = new ManagementQp(this->ibv_);
+    sess->regQp(rd_.mqp);
+    
     PCX_KING_PRINT("Created Management QP \n");
 
     /* Step #2: Register existing memory buffers with UMR */
     register_memory();
 
     /* Create a loopback QP */
-    rd_.lqp = new LoopbackQp(sess);
+    rd_.lqp = new LoopbackQp(this->ibv_);
+    sess->regQp(rd_.lqp);
     LoopbackQp *lqp = rd_.lqp;
     PCX_KING_PRINT("Created Loopback QP \n");
 
@@ -202,41 +208,50 @@ public:
       rd_.peers[step_idx].incoming_buf = new RefMem(mem_.tmpMem->next());
 
       rd_.peers[step_idx].qp =
-          new DoublingQp(sess, &p2p_exchange, (void *)&(this->context_), mypeer,
+          new DoublingQp(this->ibv_, &p2p_exchange, (void *)&(this->context_), mypeer,
                          slot, rd_.peers[step_idx].incoming_buf);
+      sess->regQp(rd_.peers[step_idx].qp);                         
       PRINT("Creating RC QP - Done");
       Iov umr_iov{rd_.result, rd_.peers[step_idx].incoming_buf};
       rd_.peers[step_idx].outgoing_buf = new UmrMem(umr_iov, ibv_);
     }
-    lqp->reduce_write(mem_.umr_mem, rd_.result, inputs,
+    sess->reduce_write(lqp, mem_.umr_mem, rd_.result, inputs,
                       MLX5DV_VECTOR_CALC_OP_ADD,
                       MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, false);
     sess->wait(lqp, false);
     for (step_idx = 0; step_idx < step_count; step_idx++) {
       if (step_idx >= pipeline) {
-        sess->wait(rd_.peers[step_idx].qp, false);
+        sess->wait(rd_.peers[step_idx].qp, false); // Wait to receive credits.
       }
-      rd_.peers[step_idx].qp->write(rd_.result, true);
-      sess->wait(rd_.peers[step_idx].qp, false);
-      sess->wait(rd_.peers[step_idx].qp, true);
-      lqp->reduce_write(rd_.peers[step_idx].outgoing_buf, rd_.result, 2,
+      // Send the data from "result" buffer to the peer and wait for the peer
+      // to also send his data to this rank's buffer.
+      sess->write(rd_.peers[step_idx].qp, rd_.result, true); // Send (write) the data to peer's buffer and requsting a completion for the sending side.
+      sess->wait(rd_.peers[step_idx].qp, false); // Wait for the peer to send his data to this rank // TODO: First need to wait for the send and then need to wait for the receive. Or maybe even better, because of symmetry, in case this ranks sends data to the peer, the peer also sends it data to this rank, so no need to use "write with completion", and no need to wait for the "send" to complete.
+      sess->wait(rd_.peers[step_idx].qp, true); // Wait for this rank to finish sending it's data to the peer.
+
+      sess->reduce_write(lqp, rd_.peers[step_idx].outgoing_buf, rd_.result, 2,
                         MLX5DV_VECTOR_CALC_OP_ADD,
                         MLX5DV_VECTOR_CALC_DATA_TYPE_FLOAT32, false);
       sess->wait(lqp, false);
-      rd_.peers[(step_idx + pipeline) % step_count].qp->send_credit();
+      sess->send_credit(rd_.peers[(step_idx + pipeline) % step_count].qp);
     }
     for (uint32_t buf_idx = 0; buf_idx < inputs; buf_idx++) {
-      lqp->write(rd_.result, mem_.usr_vec[buf_idx], false);
+      sess->write(lqp, rd_.result, mem_.usr_vec[buf_idx], false);
     }
     sess->wait(lqp, false);
     for (step_idx = 0; step_idx < pipeline; step_idx++) {
       sess->wait(rd_.peers[step_idx].qp, false);
     }
     PRINT("Graph building - Done");
+    rd_.graph->finish();
+
+    this->ibv_->mtx.unlock();
+
     PCX_KING_PRINT("connect_and_prepare DONE \n");
   }
 
   void teardown() {
+    delete (rd_.mqp);
     delete (rd_.lqp);
     delete (rd_.graph);
     delete (rd_.result);
