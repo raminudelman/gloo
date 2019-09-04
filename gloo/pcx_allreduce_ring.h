@@ -21,7 +21,6 @@
 #include <ctime>
 #include <vector>
 
-#define DEBUG
 #ifdef DEBUG
 #define PCX_RING_PRINT(args...) fprintf(stderr, "(%s: %d) in function %s: " \
                        ,__FILE__,__LINE__,__func__); fprintf(stderr, args)
