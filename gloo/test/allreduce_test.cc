@@ -15,7 +15,9 @@
 #include "gloo/allreduce.h"
 #include "gloo/allreduce_bcube.h"
 #include "gloo/allreduce_halving_doubling.h"
+#include "gloo/pcx_allreduce_king.h"
 #include "gloo/allreduce_ring.h"
+#include "gloo/pcx_allreduce_ring.h"
 #include "gloo/allreduce_ring_chunked.h"
 #include "gloo/test/base_test.h"
 
@@ -50,6 +52,7 @@ class AllreduceConstructorTest : public BaseTest {
 
 typedef ::testing::Types<
   AllreduceRing<float>,
+  PcxAllreduceRing<float>,
   AllreduceRingChunked<float> > AllreduceTypes;
 TYPED_TEST_CASE(AllreduceConstructorTest, AllreduceTypes);
 
@@ -83,11 +86,27 @@ static std::function<Func> allreduceRing = [](
   algorithm.run();
 };
 
+static std::function<Func> allreducePcxRing = [](
+    std::shared_ptr<::gloo::Context> context,
+    std::vector<float*> dataPtrs,
+    int dataSize) {
+  ::gloo::PcxAllreduceRing<float> algorithm(context, dataPtrs, dataSize);
+  algorithm.run();
+};
+
 static std::function<Func16> allreduceRingHP = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float16*> dataPtrs,
     int dataSize) {
   ::gloo::AllreduceRing<float16> algorithm(context, dataPtrs, dataSize);
+  algorithm.run();
+};
+
+static std::function<Func16> allreducePcxRingHP = [](
+    std::shared_ptr<::gloo::Context> context,
+    std::vector<float16*> dataPtrs,
+    int dataSize) {
+  ::gloo::PcxAllreduceRing<float16> algorithm(context, dataPtrs, dataSize);
   algorithm.run();
 };
 
@@ -118,6 +137,14 @@ static std::function<Func> allreduceHalvingDoubling = [](
   algorithm.run();
 };
 
+static std::function<Func> allreducePcxKing = [](
+    std::shared_ptr<::gloo::Context> context,
+    std::vector<float*> dataPtrs,
+    int dataSize) {
+  ::gloo::PcxAllreduceKing<float> algorithm(context, dataPtrs, dataSize);
+  algorithm.run();
+};
+
 static std::function<Func> allreduceBcube = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float*> dataPtrs,
@@ -132,6 +159,14 @@ static std::function<Func16> allreduceHalvingDoublingHP = [](
     int dataSize) {
   ::gloo::AllreduceHalvingDoubling<float16> algorithm(
       context, dataPtrs, dataSize);
+  algorithm.run();
+};
+
+static std::function<Func16> allreducePcxKingHP = [](
+    std::shared_ptr<::gloo::Context> context,
+    std::vector<float16*> dataPtrs,
+    int dataSize) {
+  ::gloo::PcxAllreduceKing<float16> algorithm(context, dataPtrs, dataSize);
   algorithm.run();
 };
 
@@ -166,18 +201,54 @@ TEST_P(AllreduceTest, SinglePointer) {
 }
 
 TEST_F(AllreduceTest, MultipleAlgorithms) {
+  // contextSize defines the number of ranks that will
+  // participate in the reduction operation
   auto contextSize = 4;
+
+  // dataSize defines the number of elements in every item in the ptr vector.
+  // In this test, the ptr is a vector with a single element.
   auto dataSize = 1000;
-  auto fns = {allreduceRing,
+  
+  // fns determines which algorithms will be checked.
+  // Each AllReduce operation will use a single algorithm. 
+  auto fns = {
+              allreduceRing,
+              allreducePcxRing,
               allreduceRingChunked,
               allreduceHalvingDoubling,
-              allreduceBcube};
+              allreducePcxKing,
+              allreduceBcube
+              };
 
+  // Spawn threads. Each thread is a different rank.
   spawn(contextSize, [&](std::shared_ptr<Context> context) {
     const auto contextRank = context->rank;
     auto buffer = newBuffer<float>(dataSize);
     auto* ptr = buffer.data();
+
+    // Performing AllReduce using every algorithm that stored in fns.
     for (const auto& fn : fns) {
+      // Each AllReduce will reduce a vector with size equals to dataSize.
+      // The vector of rank with rank ID 'rank_id' will have all elements
+      // equal to 'rank_id', meaning the vectors of N ranks will be as follows:
+      //     rank_0: <0,0,0,...,0> // Total of dataSize elements
+      //     rank_1: <1,1,1,...,1> // Total of dataSize elements
+      //     rank_2: <2,2,2,...,2> // Total of dataSize elements
+      //     ...
+      //     rank_N-1: <N-1,N-1,N-1,...,N-1> // Total of dataSize elements
+      //
+      // When using sum as a reduction function, after the AllReduce operation,
+      // each rank should have a vector that looks as follows:
+      //
+      //     rank_i: <0+1+2+...+N,0+1+2+...+N,...,0+1+2+...+N>
+      //
+      // Or by using the sum of am arithmetic sequence: S_n = (N*(N-1))/2
+      //  
+      //     rank_i: <(N*(N-1))/2,(N*(N-1))/2,...,(N*(N-1))/2>
+      //
+      //
+      // For contextSize=4, N will be equal to 4
+      // so the sum will be equal to 4*3/2 = 6
       for (int i = 0; i < dataSize; i++) {
         ptr[i] = contextRank;
       }
@@ -186,7 +257,7 @@ TEST_F(AllreduceTest, MultipleAlgorithms) {
 
       auto expected = (contextSize * (contextSize - 1)) / 2;
       for (int i = 0; i < dataSize; i++) {
-        ASSERT_EQ(expected, ptr[i]) << "Mismatch at index " << i;
+        ASSERT_EQ(expected, ptr[i]) << "Mismatch at index " << i << ". Rank: " << contextRank;
       }
 
       for (int i = 0; i < dataSize; i++) {
@@ -197,17 +268,20 @@ TEST_F(AllreduceTest, MultipleAlgorithms) {
 
       expected = (contextSize * (contextSize - 1)) / 2;
       for (int i = 0; i < dataSize; i++) {
-        ASSERT_EQ(expected, ptr[i]) << "Mismatch at index " << i;
+        ASSERT_EQ(expected, ptr[i]) << "Mismatch at index " << i << ". Rank: " << contextRank;
       }
     }
   });
 }
 
-TEST_F(AllreduceTestHP, HalfPrecisionTest) {
+TEST_F(AllreduceTestHP, MultipleAlgorithmsHP) {
   int contextSize = 4;
   auto dataSize = 1024;
-  auto fns = {
-      allreduceRingHP, allreduceRingChunkedHP, allreduceHalvingDoublingHP};
+  auto fns = {allreduceRingHP,
+              //allreducePcxRingHP, // TODO: PCX Does not support half precision because Vector-CALC hardware does not support float16. Need to un-commnet when hardware supports.
+              //allreducePcxKingHP, // TODO: PCX Does not support half precision because Vector-CALC hardware does not support float16. Need to un-commnet when hardware supports.
+              allreduceRingChunkedHP,
+              allreduceHalvingDoublingHP};
 
   spawn(contextSize, [&](std::shared_ptr<Context> context) {
     const auto contextRank = context->rank;
@@ -247,6 +321,20 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::Values(0)));
 
 INSTANTIATE_TEST_CASE_P(
+    AllreducePcxRing,
+    AllreduceTest,
+    ::testing::Combine(
+        // TODO: Make Ring work with all possible sizes of context (especially for a context of size == 1).
+        ::testing::ValuesIn(std::vector<int>({2, 4})), //::testing::Range(2, 16,1), // Start, End, Step size
+                                              // Sizes that does not works:
+                                              //   size = 1,        fails on:
+                                              //   size = 3,        fails on:
+                                              //   size= {1,5-inf}, fails on: Get simply stuck with no output after the getInstance() prints in verbs_ctx.cc
+        ::testing::ValuesIn(genMemorySizes()),
+        ::testing::Values(allreducePcxRing),
+        ::testing::Values(0)));
+
+INSTANTIATE_TEST_CASE_P(
     AllreduceRingChunked,
     AllreduceTest,
     ::testing::Combine(
@@ -264,6 +352,18 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::ValuesIn(std::vector<int>({1, 64, 1000})),
         ::testing::Values(allreduceHalvingDoubling),
         ::testing::Values(0)));
+
+INSTANTIATE_TEST_CASE_P(
+    AllreducePcxKing,
+    AllreduceTest,
+    ::testing::Combine(
+        ::testing::ValuesIn(
+          // TODO: Make Ring work with all possible sizes of context (especially for a context of size == 1).
+          std::vector<int>({2, 4, 8, 16, 32})), // TODO: King currently support only context size which is power of 2 (meaning 1,2,4,8, etc.).
+        ::testing::ValuesIn(std::vector<int>({1, 64, 1000})),
+        ::testing::Values(allreducePcxKing),
+        ::testing::Values(0)));
+
 
 INSTANTIATE_TEST_CASE_P(
     AllreduceBcubeBase2,

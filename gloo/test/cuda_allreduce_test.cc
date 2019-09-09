@@ -13,7 +13,9 @@
 #include "gloo/cuda_allreduce_bcube.h"
 #include "gloo/cuda_allreduce_halving_doubling.h"
 #include "gloo/cuda_allreduce_halving_doubling_pipelined.h"
+#include "gloo/pcx_allreduce_king.h"
 #include "gloo/cuda_allreduce_ring.h"
+#include "gloo/cuda_pcx_allreduce_ring.h"
 #include "gloo/cuda_allreduce_ring_chunked.h"
 #include "gloo/test/cuda_base_test.h"
 
@@ -22,6 +24,8 @@ namespace test {
 namespace {
 
 // Function to instantiate and run algorithm.
+// The function gets as arguments: context, ptrs, count and streams
+// and the returns an Algorithm.
 using Func = std::unique_ptr<::gloo::Algorithm>(
     std::shared_ptr<::gloo::Context>&,
     std::vector<float*> ptrs,
@@ -66,6 +70,15 @@ static std::function<Func> allreduceRing = [](
     new ::gloo::CudaAllreduceRing<float>(context, ptrs, count, streams));
 };
 
+static std::function<Func> allreducePcxRing = [](
+    std::shared_ptr<::gloo::Context>& context,
+    std::vector<float*> ptrs,
+    int count,
+    std::vector<cudaStream_t> streams) {
+  return std::unique_ptr<::gloo::Algorithm>(
+    new ::gloo::CudaPcxAllreduceRing<float>(context, ptrs, count, streams));
+};
+
 static std::function<Func16> allreduceRingHP = [](
     std::shared_ptr<::gloo::Context>& context,
     std::vector<float16*> ptrs,
@@ -73,6 +86,15 @@ static std::function<Func16> allreduceRingHP = [](
     std::vector<cudaStream_t> streams) {
   return std::unique_ptr<::gloo::Algorithm>(
     new ::gloo::CudaAllreduceRing<float16>(context, ptrs, count, streams));
+};
+
+static std::function<Func16> allreducePcxRingHP = [](
+    std::shared_ptr<::gloo::Context>& context,
+    std::vector<float16*> ptrs,
+    int count,
+    std::vector<cudaStream_t> streams) {
+  return std::unique_ptr<::gloo::Algorithm>(
+    new ::gloo::PcxAllreduceRing<float16>(context, ptrs, count));
 };
 
 static std::function<Func> allreduceRingChunked = [](
@@ -104,6 +126,15 @@ static std::function<Func> allreduceHalvingDoubling = [](
           context, ptrs, count, streams));
 };
 
+static std::function<Func> allreducePcxKing = [](
+    std::shared_ptr<::gloo::Context>& context,
+    std::vector<float*> ptrs,
+    int count,
+    std::vector<cudaStream_t> streams) {
+  return std::unique_ptr<::gloo::Algorithm>(
+      new ::gloo::PcxAllreduceKing<float>(context, ptrs, count));
+};
+
 static std::function<Func> allreduceBcube =
     [](std::shared_ptr<::gloo::Context>& context,
        std::vector<float*> ptrs,
@@ -121,6 +152,15 @@ static std::function<Func16> allreduceHalvingDoublingHP = [](
   return std::unique_ptr<::gloo::Algorithm>(
       new ::gloo::CudaAllreduceHalvingDoubling<float16>(
           context, ptrs, count, streams));
+};
+
+static std::function<Func16> allreducePcxKingHP = [](
+    std::shared_ptr<::gloo::Context>& context,
+    std::vector<float16*> ptrs,
+    int count,
+    std::vector<cudaStream_t> streams) {
+  return std::unique_ptr<::gloo::Algorithm>(
+      new ::gloo::PcxAllreduceKing<float16>(context, ptrs, count));
 };
 
 static std::function<Func> allreduceHalvingDoublingPipelined = [](
@@ -143,11 +183,25 @@ static std::function<Func16> allreduceHalvingDoublingPipelinedHP = [](
           context, ptrs, count, streams));
 };
 
+// SinglePointer test, tests the AllReduce algorithm to reduce
+// a single element in the ptrs vector. Notice that the single
+// element in the ptrs vector can be by itself a vector of several
+// elements. The amount of elements that consist a single element
+// of the ptrs vector is determined with 'count'.
 TEST_P(CudaAllreduceTest, SinglePointer) {
+  // Context Size (Number of ranks)
   auto size = std::get<0>(GetParam());
+  
   auto count = std::get<1>(GetParam());
+
+  // Algorithm to use for AllReduce operation
   auto fn = std::get<2>(GetParam());
+
+  // Base used as a parameter for BCube algorithm
+  // and stored in the context object
   auto base = std::get<3>(GetParam());
+
+  fprintf(stderr, "SinglePointerTest: Context Size = %d. Count = %d \n", size, count);
 
   spawn(
       size,
@@ -158,18 +212,34 @@ TEST_P(CudaAllreduceTest, SinglePointer) {
         auto algorithm = fn(context, ptrs, count, {});
         fixture.assignValues();
         algorithm->run();
-
         // Verify result
         assertResult(fixture);
       },
       base);
 }
 
+// In MultiPointer test, the ptrs vector (that is defined later)
+// contains several elements versus only a single element
+// in the SinglePointer test.
 TEST_P(CudaAllreduceTest, MultiPointer) {
+  // Context Size (Number of ranks)
   auto size = std::get<0>(GetParam());
+
+  // Number of elements in every array that will be reduced.
+  // The final reduced array will contain 'count' elements.
+  // In MultiPointer test, the ptrs vector (that is defined later)
+  // contains several elements versus only a single element
+  // in the SinglePointer test.
   auto count = std::get<1>(GetParam());
+
+  // Algorithm to use for AllReduce operation
   auto fn = std::get<2>(GetParam());
+
+  // Base used as a parameter for BCube algorithm
+  // and stored in the context object
   auto base = std::get<3>(GetParam());
+
+  fprintf(stderr, "MultiPointerTest: Context Size = %d. Count = %d \n", size, count);
 
   spawn(size, [&](std::shared_ptr<Context> context) {
       // Run algorithm
@@ -209,6 +279,8 @@ TEST_F(CudaAllreduceTest, MultipleAlgorithms) {
   auto size = 4;
   auto count = 1000;
   auto fns = {allreduceRing,
+             allreducePcxRing,
+             allreducePcxKing,
              allreduceRingChunked,
              allreduceHalvingDoubling,
              allreduceHalvingDoublingPipelined};
@@ -236,10 +308,12 @@ TEST_F(CudaAllreduceTest, MultipleAlgorithms) {
   });
 }
 
-TEST_F(CudaAllreduceTestHP, HalfPrecisionTest) {
+TEST_F(CudaAllreduceTestHP, MultipleAlgorithmsHP) {
   auto size = 4;
   auto count = 128;
   auto fns = {allreduceRingHP,
+             //allreducePcxRingHP, // TODO: PCX Does not support half precision because Vector-CALC hardware does not support float16. Need to un-commnet when hardware supports.
+             //allreducePcxKingHP, // TODO: PCX Does not support half precision because Vector-CALC hardware does not support float16. Need to un-commnet when hardware supports.
              allreduceRingChunkedHP,
              allreduceHalvingDoublingHP,
              allreduceHalvingDoublingPipelinedHP};
@@ -278,6 +352,20 @@ INSTANTIATE_TEST_CASE_P(
       ::testing::Values(0)));
 
 INSTANTIATE_TEST_CASE_P(
+    AllreducePcxRing,
+    CudaAllreduceTest,
+    ::testing::Combine(
+      // TODO: Make Ring work with all possible sizes of context (especially for a context of size == 1).
+      ::testing::ValuesIn(std::vector<int>({2, 4})), //::testing::Range(2, 16,1), // Start, End, Step size
+                                                    // Sizes that does not works:
+                                                    //   size = 1,        fails on:
+                                                    //   size = 3,        fails on:
+                                                    //   size= {1,5-inf}, fails on: Get simply stuck with no output after the getInstance() prints in verbs_ctx.cc
+      ::testing::ValuesIn(genMemorySizes()),
+      ::testing::Values(allreducePcxRing),
+      ::testing::Values(0)));
+
+INSTANTIATE_TEST_CASE_P(
     AllreduceRingChunked,
     CudaAllreduceTest,
     ::testing::Combine(
@@ -294,6 +382,17 @@ INSTANTIATE_TEST_CASE_P(
           std::vector<int>({1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 16, 24, 32})),
         ::testing::ValuesIn(std::vector<int>({1, 64, 1000})),
         ::testing::Values(allreduceHalvingDoubling),
+        ::testing::Values(0)));
+
+INSTANTIATE_TEST_CASE_P(
+    AllreducePcxKing,
+    CudaAllreduceTest,
+    ::testing::Combine(
+        ::testing::ValuesIn(
+          // TODO: Make Ring work with all possible sizes of context (especially for a context of size == 1).
+          std::vector<int>({2, 4, 8, 16, 32})), // TODO: King currently support only context size which is power of 2 (meaning 1,2,4,8, etc.).
+        ::testing::ValuesIn(std::vector<int>({1, 64, 1000})),
+        ::testing::Values(allreducePcxKing),
         ::testing::Values(0)));
 
 INSTANTIATE_TEST_CASE_P(
