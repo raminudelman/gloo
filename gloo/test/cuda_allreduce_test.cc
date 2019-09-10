@@ -203,8 +203,6 @@ TEST_P(CudaAllreduceTest, SinglePointer) {
   // and stored in the context object
   auto base = std::get<3>(GetParam());
 
-  fprintf(stderr, "SinglePointerTest: Context Size = %d. Count = %d \n", size, count);
-
   spawn(
       size,
       [&](std::shared_ptr<Context> context) {
@@ -236,8 +234,6 @@ TEST_P(CudaAllreduceTest, MultiPointer) {
   // Base used as a parameter for BCube algorithm
   // and stored in the context object
   auto base = std::get<3>(GetParam());
-
-  fprintf(stderr, "MultiPointerTest: Context Size = %d. Count = %d \n", size, count);
 
   spawn(size, [&](std::shared_ptr<Context> context) {
       // Run algorithm
