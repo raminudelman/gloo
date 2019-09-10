@@ -167,8 +167,7 @@ public:
     // No need to reduce the ptrs vector, because
     // it's already reduced. The reduced result is
     // the first element in the ptrs vector (ptrs[0])
-    if (this->contextSize_ == 1)
-    {
+    if (this->contextSize_ == 1) {
       return;
     }
 
