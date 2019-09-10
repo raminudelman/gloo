@@ -269,7 +269,7 @@ int main(int argc, char** argv) {
   } else if (x.halfPrecision) {
     RUN_BENCHMARK(float16);
   } else {
-    RUN_BENCHMARK(int);
+    RUN_BENCHMARK(int); // TODO: (Rami) Need to change to "float". Yaniv changed this to int only for debug reasons and forgot to revert before committing
   }
   return 0;
 }

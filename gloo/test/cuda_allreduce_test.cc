@@ -13,6 +13,7 @@
 #include "gloo/cuda_allreduce_bcube.h"
 #include "gloo/cuda_allreduce_halving_doubling.h"
 #include "gloo/cuda_allreduce_halving_doubling_pipelined.h"
+#include "gloo/pcx_allreduce_king.h"
 #include "gloo/cuda_allreduce_ring.h"
 #include "gloo/cuda_pcx_allreduce_ring.h"
 #include "gloo/cuda_pcx_allreduce_king.h"
@@ -191,7 +192,8 @@ static std::function<Func16> allreduceHalvingDoublingPipelinedHP = [](
 TEST_P(CudaAllreduceTest, SinglePointer) {
   // Context Size (Number of ranks)
   auto size = std::get<0>(GetParam());
-  
+
+  // Number of elements within a single ptrs element.  
   auto count = std::get<1>(GetParam());
 
   // Algorithm to use for AllReduce operation
@@ -225,11 +227,7 @@ TEST_P(CudaAllreduceTest, MultiPointer) {
   // Context Size (Number of ranks)
   auto size = std::get<0>(GetParam());
 
-  // Number of elements in every array that will be reduced.
-  // The final reduced array will contain 'count' elements.
-  // In MultiPointer test, the ptrs vector (that is defined later)
-  // contains several elements versus only a single element
-  // in the SinglePointer test.
+  // Number of elements within a single ptrs element.  
   auto count = std::get<1>(GetParam());
 
   // Algorithm to use for AllReduce operation
@@ -357,10 +355,10 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Combine(
       // TODO: Make Ring work with all possible sizes of context (especially for a context of size == 1).
       ::testing::ValuesIn(std::vector<int>({2, 4})), //::testing::Range(2, 16,1), // Start, End, Step size
-                                                    // Sizes that does not works:
-                                                    //   size = 1,        fails on:
-                                                    //   size = 3,        fails on:
-                                                    //   size= {1,5-inf}, fails on: Get simply stuck with no output after the getInstance() prints in verbs_ctx.cc
+                                                     // Sizes that does not works:
+                                                     //   size = 1,        fails on:
+                                                     //   size = 3,        fails on:
+                                                     //   size= {1,5-inf}, fails on: Get simply stuck with no output after the getInstance() prints in verbs_ctx.cc
       ::testing::ValuesIn(genMemorySizes()),
       ::testing::Values(allreducePcxRing),
       ::testing::Values(0)));

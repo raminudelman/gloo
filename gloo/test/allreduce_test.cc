@@ -326,10 +326,10 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Combine(
         // TODO: Make Ring work with all possible sizes of context (especially for a context of size == 1).
         ::testing::ValuesIn(std::vector<int>({2, 4})), //::testing::Range(2, 16,1), // Start, End, Step size
-                                              // Sizes that does not works:
-                                              //   size = 1,        fails on:
-                                              //   size = 3,        fails on:
-                                              //   size= {1,5-inf}, fails on: Get simply stuck with no output after the getInstance() prints in verbs_ctx.cc
+                                                       // Sizes that does not works:
+                                                       //   size = 1,        fails on:
+                                                       //   size = 3,        fails on:
+                                                       //   size= {1,5-inf}, fails on: Get simply stuck with no output after the getInstance() prints in verbs_ctx.cc
         ::testing::ValuesIn(genMemorySizes()),
         ::testing::Values(allreducePcxRing),
         ::testing::Values(0)));
