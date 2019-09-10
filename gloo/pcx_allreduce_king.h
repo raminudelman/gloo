@@ -76,6 +76,13 @@ public:
       return;
     }
 
+    // PCX performs the elements reduction on the NIC using Vector-CALC.
+    // The reduction is on the number of elements in ptrs and another element
+    // that is the result from a peer rank
+    if ((ptrs.size() + 1) > MAX_LOCAL_VECTOR_SIZE_TO_REDUCE) {
+      fprintf(stderr, "PCX does not support more than %d to be reduced on the NIC", MAX_LOCAL_VECTOR_SIZE_TO_REDUCE);
+    }
+
     /* Step #1: Initialize verbs for all to use */
     PCX_KING_PRINT("starting PcxAllreduceKing \n");
     ibv_ = VerbCtx::getInstance();
