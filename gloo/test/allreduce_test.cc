@@ -92,7 +92,6 @@ static std::function<Func> allreducePcxRing = [](
     int dataSize) {
   ::gloo::PcxAllreduceRing<float> algorithm(context, dataPtrs, dataSize);
   algorithm.run();
-  algorithm.run();
 };
 
 static std::function<Func16> allreduceRingHP = [](

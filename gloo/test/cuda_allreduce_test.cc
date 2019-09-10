@@ -15,7 +15,8 @@
 #include "gloo/cuda_allreduce_halving_doubling_pipelined.h"
 #include "gloo/pcx_allreduce_king.h"
 #include "gloo/cuda_allreduce_ring.h"
-#include "gloo/pcx_allreduce_ring.h"
+#include "gloo/cuda_pcx_allreduce_ring.h"
+#include "gloo/cuda_pcx_allreduce_king.h"
 #include "gloo/cuda_allreduce_ring_chunked.h"
 #include "gloo/test/cuda_base_test.h"
 
@@ -76,7 +77,7 @@ static std::function<Func> allreducePcxRing = [](
     int count,
     std::vector<cudaStream_t> streams) {
   return std::unique_ptr<::gloo::Algorithm>(
-    new ::gloo::PcxAllreduceRing<float>(context, ptrs, count));
+    new ::gloo::CudaPcxAllreduceRing<float>(context, ptrs, count, streams));
 };
 
 static std::function<Func16> allreduceRingHP = [](
@@ -132,7 +133,7 @@ static std::function<Func> allreducePcxKing = [](
     int count,
     std::vector<cudaStream_t> streams) {
   return std::unique_ptr<::gloo::Algorithm>(
-      new ::gloo::PcxAllreduceKing<float>(context, ptrs, count));
+      new ::gloo::CudaPcxAllreduceKing<float>(context, ptrs, count, streams));
 };
 
 static std::function<Func> allreduceBcube =
@@ -202,6 +203,8 @@ TEST_P(CudaAllreduceTest, SinglePointer) {
   // and stored in the context object
   auto base = std::get<3>(GetParam());
 
+  fprintf(stderr, "SinglePointerTest: Context Size = %d. Count = %d \n", size, count);
+
   spawn(
       size,
       [&](std::shared_ptr<Context> context) {
@@ -211,7 +214,6 @@ TEST_P(CudaAllreduceTest, SinglePointer) {
         auto algorithm = fn(context, ptrs, count, {});
         fixture.assignValues();
         algorithm->run();
-
         // Verify result
         assertResult(fixture);
       },
@@ -234,6 +236,8 @@ TEST_P(CudaAllreduceTest, MultiPointer) {
   // Base used as a parameter for BCube algorithm
   // and stored in the context object
   auto base = std::get<3>(GetParam());
+
+  fprintf(stderr, "MultiPointerTest: Context Size = %d. Count = %d \n", size, count);
 
   spawn(size, [&](std::shared_ptr<Context> context) {
       // Run algorithm
