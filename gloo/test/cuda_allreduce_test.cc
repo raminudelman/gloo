@@ -13,9 +13,9 @@
 #include "gloo/cuda_allreduce_bcube.h"
 #include "gloo/cuda_allreduce_halving_doubling.h"
 #include "gloo/cuda_allreduce_halving_doubling_pipelined.h"
-#include "gloo/pcx_allreduce_king.h"
 #include "gloo/cuda_allreduce_ring.h"
 #include "gloo/cuda_pcx_allreduce_ring.h"
+#include "gloo/cuda_pcx_allreduce_king.h"
 #include "gloo/cuda_allreduce_ring_chunked.h"
 #include "gloo/test/cuda_base_test.h"
 
@@ -132,7 +132,7 @@ static std::function<Func> allreducePcxKing = [](
     int count,
     std::vector<cudaStream_t> streams) {
   return std::unique_ptr<::gloo::Algorithm>(
-      new ::gloo::PcxAllreduceKing<float>(context, ptrs, count));
+      new ::gloo::CudaPcxAllreduceKing<float>(context, ptrs, count, streams));
 };
 
 static std::function<Func> allreduceBcube =
