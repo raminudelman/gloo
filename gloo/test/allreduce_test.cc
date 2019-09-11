@@ -588,7 +588,7 @@ INSTANTIATE_TEST_CASE_P(
                                                        //   size = 3,        fails on:
                                                        //   size= {1,5-inf}, fails on: Get simply stuck with no output after the getInstance() prints in verbs_ctx.cc
         ::testing::ValuesIn(std::vector<int>({1, 32})), // TODO: Need to add {64,1000}. Currently it fails on data mismatch
-        ::testing::Values(allreducePcxKing),
+        ::testing::Values(allreducePcxRing),
         ::testing::Values(0), // Base
         ::testing::ValuesIn(std::vector<int>({1,2})))); // Times to run the algorithm // TODO: Need to add {3,4,5} times too. Currently it fails on data mismatch
 
