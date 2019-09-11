@@ -22,9 +22,11 @@
 #include <vector>
 
 #ifdef DEBUG
-#define PCX_RING_PRINT(args...)                                               \
-  fprintf(stderr, "(%s: %d) in function %s: ", __FILE__, __LINE__, __func__); \
-  fprintf(stderr, args)
+#define PCX_RING_PRINT(args...)                                                \
+  if (contextRank_ == 0) {                                                     \
+    fprintf(stderr, "(%s: %d) in function %s: ", __FILE__, __LINE__, __func__);\
+    fprintf(stderr, args);                                                     \
+  };
 #else
 #define PCX_RING_PRINT(args...)
 #endif
@@ -211,13 +213,19 @@ public:
   void run()
   {
     debug_write_input();
+    debug_hang_report("Start");
+
     rd_.graph->mqp->qp->db(); // TODO: graph has db() API function. Use it! mpq should not be accessed!
+
+    debug_hang_report("After Doorbell");
 
     // Calling the rearm after the collective operation started (using the
     // DoorBell) makes the rearm process to run in parallel with the
     // collective algorithm.
     rd_.graph->mqp->qp->rearm();
 
+    debug_hang_report("After ReArm");
+    
     int res = 0;
     uint64_t count = 0;
 
@@ -226,10 +234,9 @@ public:
       res = rd_.lqp->qp->poll();
 
       ++count;
-      if (contextRank_ == 0)
-      {
-        debug_hang_report(count);
-      }
+      
+      debug_hang_report("Stuck", count);
+
     }
     debug_check_output();
     ++mone_;
@@ -436,7 +443,9 @@ public:
       PCX_RING_PRINT("Returned all credits to peer \n");
     }
 
+    PCX_RING_PRINT("Finalizing the graph\n");
     sess->finish();
+    PCX_RING_PRINT("Finalized the graph\n");
 
     ibv_ctx_->mtx.unlock();
 
@@ -463,22 +472,38 @@ public:
   }
 
   // Debug function // TODO: Make this function private!
-  void debug_hang_report(uint64_t &count)
+  void debug_hang_report(std::string str, int count = 0)
   {
 #ifdef HANG_REPORT
-    if (count == 1000000000)
-    {
-      fprintf(stderr, "iteration: %d\n", mone_);
-      fprintf(stderr, "poll cnt: %d\n", rd_.lqp->qp->get_poll_cnt());
-      fprintf(stderr, "managment qp:\n");
-      rd_.graph->mqp->print();
-      fprintf(stderr, "loopback qp:\n");
-      rd_.lqp->print();
-      fprintf(stderr, "right qp:\n");
-      rd_.pqp->right->print();
-      fprintf(stderr, "left qp:\n");
-      rd_.pqp->left->print();
+    if ((count != 0) and (count != 1000000)) {
+      return;
     }
+    if (contextRank_ != 0) {
+      return;
+    }
+    char msg[str.length() + 1];
+    strcpy(msg, str.c_str());
+
+    fprintf(stderr, "======================================================\n");
+    fprintf(stderr, "Run #%d: %s \n", mone_, msg);
+    fprintf(stderr, "======================================================\n");
+    fprintf(stderr, "Waiting for Loopback QP CQE with index %d to be completed\n", rd_.lqp->qp->get_poll_cnt());
+    fprintf(stderr, "=======================================\n");
+    fprintf(stderr, "Management QP: Run #%d: %s\n", mone_, msg);
+    fprintf(stderr, "=======================================\n");
+    rd_.mqp->print();
+    fprintf(stderr, "=======================================\n");
+    fprintf(stderr, "Loopback QP: Run #%d: %s\n", mone_, msg);
+    fprintf(stderr, "=======================================\n");
+    rd_.lqp->print();
+    fprintf(stderr, "=======================================\n");
+    fprintf(stderr, "Right QP: Run #%d: %s\n", mone_, msg);
+    fprintf(stderr, "=======================================\n");
+    rd_.pqp->right->print();
+    fprintf(stderr, "=======================================\n");
+    fprintf(stderr, "Left QP: Run #%d: %s\n", mone_, msg);
+    fprintf(stderr, "=======================================\n");
+    rd_.pqp->left->print();
 #endif // HANG_REPORT
   }
 
