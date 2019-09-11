@@ -35,12 +35,14 @@ std::vector<T, aligned_allocator<T, kBufferAlignment>> newBuffer(int size) {
 using Func = void(
     std::shared_ptr<::gloo::Context>,
     std::vector<float*> dataPtrs,
-    int dataSize);
+    int dataSize,
+    int repeat);
 
 using Func16 = void(
     std::shared_ptr<::gloo::Context>,
     std::vector<float16*> dataPtrs,
-    int dataSize);
+    int dataSize,
+    int repeat);
 
 // Test parameterization.
 using Param = std::tuple<int, int, std::function<Func>, int>;
@@ -81,93 +83,126 @@ TYPED_TEST(AllreduceConstructorTest, SpecifyReductionFunction) {
 static std::function<Func> allreduceRing = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float*> dataPtrs,
-    int dataSize) {
+    int dataSize,
+    int repeat = 1) {
   ::gloo::AllreduceRing<float> algorithm(context, dataPtrs, dataSize);
-  algorithm.run();
+  for (int i = 0; i < repeat; ++i) {
+    algorithm.run();
+  }
 };
 
 static std::function<Func> allreducePcxRing = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float*> dataPtrs,
-    int dataSize) {
+    int dataSize,
+    int repeat = 1) {
   ::gloo::PcxAllreduceRing<float> algorithm(context, dataPtrs, dataSize);
-  algorithm.run();
+  for (int i = 0; i < repeat; ++i) {
+    algorithm.run();
+  }
 };
 
 static std::function<Func16> allreduceRingHP = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float16*> dataPtrs,
-    int dataSize) {
+    int dataSize,
+    int repeat = 1) {
   ::gloo::AllreduceRing<float16> algorithm(context, dataPtrs, dataSize);
-  algorithm.run();
+  for (int i = 0; i < repeat; ++i) {
+    algorithm.run();
+  }
 };
 
 static std::function<Func16> allreducePcxRingHP = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float16*> dataPtrs,
-    int dataSize) {
+    int dataSize,
+    int repeat = 1) {
   ::gloo::PcxAllreduceRing<float16> algorithm(context, dataPtrs, dataSize);
-  algorithm.run();
+  for (int i = 0; i < repeat; ++i) {
+    algorithm.run();
+  }
 };
 
 static std::function<Func> allreduceRingChunked = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float*> dataPtrs,
-    int dataSize) {
+    int dataSize,
+    int repeat = 1) {
   ::gloo::AllreduceRingChunked<float> algorithm(
       context, dataPtrs, dataSize);
-  algorithm.run();
+  for (int i = 0; i < repeat; ++i) {
+    algorithm.run();
+  }
 };
 
 static std::function<Func16> allreduceRingChunkedHP = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float16*> dataPtrs,
-    int dataSize) {
+    int dataSize,
+    int repeat = 1) {
   ::gloo::AllreduceRingChunked<float16> algorithm(
       context, dataPtrs, dataSize);
-  algorithm.run();
+  for (int i = 0; i < repeat; ++i) {
+    algorithm.run();
+  }
 };
 
 static std::function<Func> allreduceHalvingDoubling = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float*> dataPtrs,
-    int dataSize) {
+    int dataSize,
+    int repeat = 1) {
   ::gloo::AllreduceHalvingDoubling<float> algorithm(
       context, dataPtrs, dataSize);
-  algorithm.run();
+  for (int i = 0; i < repeat; ++i) {
+    algorithm.run();
+  }
 };
 
 static std::function<Func> allreducePcxKing = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float*> dataPtrs,
-    int dataSize) {
+    int dataSize,
+    int repeat = 1) {
   ::gloo::PcxAllreduceKing<float> algorithm(context, dataPtrs, dataSize);
-  algorithm.run();
+  for (int i = 0; i < repeat; ++i) {
+    algorithm.run();
+  }
 };
 
 static std::function<Func> allreduceBcube = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float*> dataPtrs,
-    int dataSize) {
+    int dataSize,
+    int repeat = 1) {
   ::gloo::AllreduceBcube<float> algorithm(context, dataPtrs, dataSize);
-  algorithm.run();
+  for (int i = 0; i < repeat; ++i) {
+    algorithm.run();
+  }
 };
 
 static std::function<Func16> allreduceHalvingDoublingHP = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float16*> dataPtrs,
-    int dataSize) {
+    int dataSize,
+    int repeat = 1) {
   ::gloo::AllreduceHalvingDoubling<float16> algorithm(
       context, dataPtrs, dataSize);
-  algorithm.run();
+  for (int i = 0; i < repeat; ++i) {
+    algorithm.run();
+  }
 };
 
 static std::function<Func16> allreducePcxKingHP = [](
     std::shared_ptr<::gloo::Context> context,
     std::vector<float16*> dataPtrs,
-    int dataSize) {
+    int dataSize,
+    int repeat = 1) {
   ::gloo::PcxAllreduceKing<float16> algorithm(context, dataPtrs, dataSize);
-  algorithm.run();
+  for (int i = 0; i < repeat; ++i) {
+    algorithm.run();
+  }
 };
 
 // Test fixture.
@@ -191,7 +226,7 @@ TEST_P(AllreduceTest, SinglePointer) {
       ptr[i] = contextRank;
     }
 
-    fn(context, std::vector<float*>{ptr}, dataSize);
+    fn(context, std::vector<float*>{ptr}, dataSize, 1);
 
     auto expected = (contextSize * (contextSize - 1)) / 2;
     for (int i = 0; i < dataSize; i++) {
@@ -253,20 +288,26 @@ TEST_F(AllreduceTest, MultipleAlgorithms) {
         ptr[i] = contextRank;
       }
 
-      fn(context, std::vector<float*>{ptr}, dataSize);
+      fn(context, std::vector<float*>{ptr}, dataSize, 1);
 
       auto expected = (contextSize * (contextSize - 1)) / 2;
       for (int i = 0; i < dataSize; i++) {
         ASSERT_EQ(expected, ptr[i]) << "Mismatch at index " << i << ". Rank: " << contextRank;
       }
 
+      // Now we will populate the ptr vector with the same data but we will
+      // run the allreduce algorithm twice in a row. After the first run,
+      // all the elements if ptr will be equal to the sum of all ranks, and
+      // the second run will perform another allreduce that will cause each
+      // element in the ptr vector to be equal the sum of all ranks and then
+      // multiplied by the amount of ranks.
       for (int i = 0; i < dataSize; i++) {
         ptr[i] = contextRank;
       }
 
-      fn(context, std::vector<float*>{ptr}, dataSize);
+      fn(context, std::vector<float*>{ptr}, dataSize, 2);
 
-      expected = (contextSize * (contextSize - 1)) / 2;
+      expected = ((contextSize * (contextSize - 1)) / 2) * contextSize;
       for (int i = 0; i < dataSize; i++) {
         ASSERT_EQ(expected, ptr[i]) << "Mismatch at index " << i << ". Rank: " << contextRank;
       }
@@ -292,7 +333,7 @@ TEST_F(AllreduceTestHP, MultipleAlgorithmsHP) {
         ptr[i] = contextRank;
       }
 
-      fn(context, std::vector<float16*>{ptr}, dataSize);
+      fn(context, std::vector<float16*>{ptr}, dataSize, 1);
 
       float16 expected(contextSize * (contextSize - 1) / 2);
       for (int i = 0; i < dataSize; i++) {
@@ -493,6 +534,63 @@ TEST_F(AllreduceNewTest, TestTimeout) {
     }
   });
 }
+
+
+using RepeatParam = std::tuple<int, int, std::function<Func>, int, int>;
+class RepeatAllreduceTest : public BaseTest,
+                      public ::testing::WithParamInterface<RepeatParam> {};
+
+TEST_P(RepeatAllreduceTest, RepeatSinglePointer) {
+  auto contextSize = std::get<0>(GetParam());
+  auto dataSize = std::get<1>(GetParam());
+  auto fn = std::get<2>(GetParam());
+  auto base = std::get<3>(GetParam());
+  auto repeat = std::get<4>(GetParam());
+
+  spawn(contextSize, [&](std::shared_ptr<Context> context) {
+    const auto contextRank = context->rank;
+    auto buffer = newBuffer<float>(dataSize);
+    auto* ptr = buffer.data();
+    for (int i = 0; i < dataSize; i++) {
+      ptr[i] = contextRank;
+    }
+
+    fn(context, std::vector<float*>{ptr}, dataSize, repeat);
+
+    auto ranks_sum = (contextSize * (contextSize - 1)) / 2;
+    auto expected = ranks_sum * pow(contextSize, repeat - 1);
+    for (int i = 0; i < dataSize; i++) {
+      ASSERT_EQ(expected, ptr[i]) << "Mismatch at index " << i;
+    }
+  }, base);
+}
+
+INSTANTIATE_TEST_CASE_P(
+    RepeatAllreducePcxKing,
+    RepeatAllreduceTest,
+    ::testing::Combine(
+        ::testing::ValuesIn(
+          // TODO: Make Ring work with all possible sizes of context (especially for a context of size == 1).
+          std::vector<int>({2, 4, 8, 16})), // TODO: King currently support only context size which is power of 2 (meaning 1,2,4,8, etc.). // TODO: Need to add {32}. Currently it fails on data mismatch
+        ::testing::ValuesIn(std::vector<int>({1, 64})), // TODO: Need to add {1000}. Currently it fails on data mismatch
+        ::testing::Values(allreducePcxKing),
+        ::testing::Values(0), // Base
+        ::testing::ValuesIn(std::vector<int>({1,2})))); // Times to run the algorithm. // TODO: Need to add {3,4,5} times too. Currently it fails on data mismatch
+
+INSTANTIATE_TEST_CASE_P(
+    RepeatAllreducePcxRing,
+    RepeatAllreduceTest,
+    ::testing::Combine(
+        // TODO: Make Ring work with all possible sizes of context (especially for a context of size == 1).
+        ::testing::ValuesIn(std::vector<int>({2, 4, 16})), //::testing::Range(2, 16,1), // Start, End, Step size // TODO: Need to add {32}. Currently it fails on data mismatch
+                                                       // Sizes that does not works:
+                                                       //   size = 1,        fails on:
+                                                       //   size = 3,        fails on:
+                                                       //   size= {1,5-inf}, fails on: Get simply stuck with no output after the getInstance() prints in verbs_ctx.cc
+        ::testing::ValuesIn(std::vector<int>({1, 32})), // TODO: Need to add {64,1000}. Currently it fails on data mismatch
+        ::testing::Values(allreducePcxKing),
+        ::testing::Values(0), // Base
+        ::testing::ValuesIn(std::vector<int>({1,2})))); // Times to run the algorithm // TODO: Need to add {3,4,5} times too. Currently it fails on data mismatch
 
 } // namespace
 } // namespace test
