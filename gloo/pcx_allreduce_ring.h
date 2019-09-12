@@ -261,7 +261,7 @@ public:
     // "finalized".
     ibv_ctx_->mtx.lock();
 
-    rd_.graph = new CommGraph(ibv_ctx_);
+    rd_.graph = new CommGraph();
     CommGraph *sess = rd_.graph;
 
     // Create a single management QP

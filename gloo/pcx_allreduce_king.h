@@ -175,7 +175,7 @@ public:
     PCX_KING_PRINT("Locking the IB verbs context mtx \n");
     this->ibv_->mtx.lock();
 
-    rd_.graph = new CommGraph(ctx);
+    rd_.graph = new CommGraph();
     CommGraph *sess = rd_.graph;
 
     // Create a single management QP
