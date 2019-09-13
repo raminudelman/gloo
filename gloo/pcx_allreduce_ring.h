@@ -72,14 +72,6 @@ public:
   RingQp *left;
 };
 
-typedef struct mem_registration_ring
-{ // TODO: Convert into a class and delete from pcx_mem.h all the Iop* functions and typdefs
-  // TODO: Add documentation
-  Iop usr_vec;
-
-  PipeMem *tmpMem;
-} mem_registration_ring_t;
-
 // Performs data exchange between peers in ring.
 // Sends data of size 'size' to 'peer' from 'send_buf' and
 // receives data of size 'size' from 'peer' to 'recv_buf'.
@@ -111,24 +103,6 @@ public:
   Iov umr_iov;          // Iov == Input/Output Vector, UMR is because the user's buffer is not contigious and we convert it to a UMR.
   NetMem *outgoing_buf; // The buffer which contains the result of the reduce and which will be sent to the peer rank
 };
-
-typedef struct rd_connections_ring
-{
-  CommGraph *graph;
-
-  ManagementQp *mqp; // mqp stands for "Management Queue Pair"
-  LoopbackQp *lqp;   // lqp stands for "Loopback Queue Pair"
-  RingPair *pqp;     // pqp stands for "Pair Queue Pair"
-
-  // Holds the number of iterations that will be executed during the All-Reduce
-  // algorithm
-  unsigned iters_cnt;
-
-  // Each element in the array holds all the data structure that the algorithm
-  // operates on during each step of the algorithm.
-  StepCtx *iters;
-
-} rd_connections_ring_t;
 
 template <typename T>
 class PcxAllreduceRing : public Algorithm
@@ -612,7 +586,32 @@ protected:
 
   VerbCtx *ibv_ctx_;
 
+  typedef struct mem_registration_ring { // TODO: Convert into a class and delete from pcx_mem.h all the Iop* functions and typdefs
+    // TODO: Add documentation
+    Iop usr_vec;
+
+    PipeMem *tmpMem;
+  } mem_registration_ring_t;
+
   mem_registration_ring_t mem_;
+
+  typedef struct rd_connections_ring {
+    CommGraph *graph;
+
+    ManagementQp *mqp; // mqp stands for "Management Queue Pair"
+    LoopbackQp *lqp;   // lqp stands for "Loopback Queue Pair"
+    RingPair *pqp;     // pqp stands for "Pair Queue Pair"
+
+    // Holds the number of iterations that will be executed during the All-Reduce
+    // algorithm
+    unsigned iters_cnt;
+
+    // Each element in the array holds all the data structure that the algorithm
+    // operates on during each step of the algorithm.
+    StepCtx *iters;
+
+  } rd_connections_ring_t;
+
   rd_connections_ring_t rd_;
 
   // Counts how many times the algorithm ran (for debug reasons).
