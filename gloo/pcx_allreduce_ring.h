@@ -34,44 +34,6 @@
 namespace gloo
 {
 
-class RingPair
-{ // TODO: Move to new file pcx_ring.h
-public:
-  RingPair(CommGraph *cgraph, p2p_exchange_func func, void *comm, // TODO: Move to some "ring algorithms qps" file
-           uint32_t myRank, uint32_t commSize, uint32_t tag1,
-           uint32_t tag2, PipeMem *incoming, VerbCtx *ctx)
-  {
-    uint32_t rightRank = (myRank + 1) % commSize;
-    uint32_t leftRank = (myRank - 1 + commSize) % commSize;
-
-    if (myRank % 2)
-    { // Odd rank
-      this->right = new RingQp(ctx, func, comm, rightRank, tag1, incoming);
-      cgraph->regQp(this->right);
-      this->left = new RingQp(ctx, func, comm, leftRank, tag2, incoming);
-      cgraph->regQp(this->left);
-    }
-    else
-    { // Even rank
-      this->left = new RingQp(ctx, func, comm, leftRank, tag1, incoming);
-      cgraph->regQp(this->left);
-      this->right = new RingQp(ctx, func, comm, rightRank, tag2, incoming);
-      cgraph->regQp(this->right);
-    }
-    right->set_pair(left);
-    left->set_pair(right);
-  }
-
-  ~RingPair()
-  {
-    delete (right);
-    delete (left);
-  }
-
-  RingQp *right;
-  RingQp *left;
-};
-
 // Performs data exchange between peers in ring.
 // Sends data of size 'size' to 'peer' from 'send_buf' and
 // receives data of size 'size' from 'peer' to 'recv_buf'.
@@ -594,6 +556,38 @@ protected:
   } mem_registration_ring_t;
 
   mem_registration_ring_t mem_;
+
+  class RingPair { // TODO: Move to new file pcx_ring.h
+  public:
+    RingPair(CommGraph *cgraph, p2p_exchange_func func, void *comm, // TODO: Move to some "ring algorithms qps" file
+             uint32_t myRank, uint32_t commSize, uint32_t tag1,
+             uint32_t tag2, PipeMem *incoming, VerbCtx *ctx) {
+      uint32_t rightRank = (myRank + 1) % commSize;
+      uint32_t leftRank = (myRank - 1 + commSize) % commSize;
+  
+      if (myRank % 2) { // Odd rank
+        this->right = new RingQp(ctx, func, comm, rightRank, tag1, incoming);
+        cgraph->regQp(this->right);
+        this->left = new RingQp(ctx, func, comm, leftRank, tag2, incoming);
+        cgraph->regQp(this->left);
+      } else { // Even rank
+        this->left = new RingQp(ctx, func, comm, leftRank, tag1, incoming);
+        cgraph->regQp(this->left);
+        this->right = new RingQp(ctx, func, comm, rightRank, tag2, incoming);
+        cgraph->regQp(this->right);
+      }
+      right->set_pair(left);
+      left->set_pair(right);
+    }
+  
+    ~RingPair() {
+      delete (right);
+      delete (left);
+    }
+  
+    RingQp *right;
+    RingQp *left;
+  };
 
   typedef struct rd_connections_ring {
     CommGraph *graph;
