@@ -53,19 +53,6 @@ namespace gloo
 int ring_exchange(void *comm, volatile void *send_buf, volatile void *recv_buf,
                   size_t size, uint32_t peer, uint32_t tag);
 
-class StepCtx
-{
-public:
-  StepCtx() : outgoing_buf(NULL), umr_iov(){};
-  ~StepCtx()
-  {
-    delete (this->outgoing_buf);
-    freeIov(umr_iov);
-  };
-  Iov umr_iov;          // Iov == Input/Output Vector, UMR is because the user's buffer is not contigious and we convert it to a UMR.
-  NetMem *outgoing_buf; // The buffer which contains the result of the reduce and which will be sent to the peer rank
-};
-
 template <typename T>
 class PcxAllreduceRing : public Algorithm
 {
@@ -587,6 +574,17 @@ protected:
   
     RingQp *right;
     RingQp *left;
+  };
+
+  class StepCtx {
+  public:
+    StepCtx() : outgoing_buf(NULL), umr_iov() {};
+    ~StepCtx() {
+      delete (this->outgoing_buf);
+      freeIov(umr_iov);
+    };
+    Iov umr_iov;          // Iov == Input/Output Vector, UMR is because the user's buffer is not contigious and we convert it to a UMR.
+    NetMem *outgoing_buf; // The buffer which contains the result of the reduce and which will be sent to the peer rank
   };
 
   typedef struct rd_connections_ring {
