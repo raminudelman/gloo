@@ -531,7 +531,7 @@ protected:
 
   // The reduction function to use when performing the reduce operation.
   // Initialized in the constructor.
-  const ReductionFunction<T> *fn_;
+  const ReductionFunction<T> *fn_; // TODO: Currently not in use. Need to start using it...
 
   VerbCtx *ibv_ctx_;
 
