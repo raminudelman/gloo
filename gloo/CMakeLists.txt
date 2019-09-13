@@ -20,7 +20,7 @@ list(APPEND GLOO_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/types.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_ring.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_king.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_allreduce_common.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/allreduce_alg_common.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/dv_mgr.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/qps.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_mem.cc"
