@@ -52,6 +52,8 @@ public:
         count_(count),
         bytes_(count_ * sizeof(T)),
         pieceSize_(bytes_ / contextSize_),
+        tag1(this->context_->nextSlot()),
+        tag2(this->context_->nextSlot()),
         fn_(fn)
   {
 
@@ -196,11 +198,9 @@ public:
 
     // Establish a connection with each peer
     uint32_t myRank = contextRank_;
-    uint32_t slot1 = this->context_->nextSlot();
-    uint32_t slot2 = this->context_->nextSlot();
 
     rd_.pqp = new RingPair(sess, &ring_exchange, (void *)&(this->context_),
-                           myRank, contextSize_, slot1, slot2, mem_.tmpMem, ibv_ctx_);
+                           myRank, contextSize_, tag1, tag2, mem_.tmpMem, ibv_ctx_);
     PCX_RING_PRINT("RC ring QPs created \n");
 
     // Allocating a data structure for every step in the algorithm.
@@ -586,6 +586,10 @@ protected:
   // The size of each chunk that will be moved through
   // ring throughout the run of the algorithm
   size_t pieceSize_;
+
+  // Used for out of band QPs exchange
+  uint32_t tag1;
+  uint32_t tag2;
 };
 
 } // namespace gloo
