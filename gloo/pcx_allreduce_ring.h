@@ -8,16 +8,14 @@
 
 #pragma once
 
-#define RING_PIPELINE_DEPTH 1
+#include "third-party/pcx/allreduce_alg_common.h"
+
+#include "gloo/algorithm.h"
+#include "gloo/context.h"
 
 #include <alloca.h>
 #include <stddef.h>
 #include <string.h>
-
-#include "gloo/algorithm.h"
-#include "gloo/context.h"
-#include "third-party/pcx/allreduce_alg_common.h"
-
 #include <ctime>
 #include <vector>
 
@@ -30,6 +28,8 @@
 #else
 #define PCX_RING_PRINT(args...)
 #endif
+
+#define RING_PIPELINE_DEPTH 1
 
 namespace gloo
 {
