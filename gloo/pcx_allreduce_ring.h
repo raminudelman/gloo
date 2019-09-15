@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "third-party/pcx/allreduce_alg_common.h"
+#include "third-party/pcx/allreduce_alg_chunked_ring.h"
 
 #include "gloo/algorithm.h"
 #include "gloo/context.h"
@@ -18,18 +18,6 @@
 #include <string.h>
 #include <ctime>
 #include <vector>
-
-#ifdef DEBUG
-#define PCX_RING_PRINT(args...)                                                \
-  if (contextRank_ == 0) {                                                     \
-    fprintf(stderr, "(%s: %d) in function %s: ", __FILE__, __LINE__, __func__);\
-    fprintf(stderr, args);                                                     \
-  };
-#else
-#define PCX_RING_PRINT(args...)
-#endif
-
-#define RING_PIPELINE_DEPTH 1
 
 namespace gloo
 {
