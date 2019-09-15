@@ -8,11 +8,9 @@
 
 #include "gloo/pcx_allreduce_ring.h"
 
-namespace gloo {
-
 int ring_exchange(void *comm, volatile void *send_buf, volatile void *recv_buf,
                  size_t size, uint32_t peer, uint32_t tag) {
-  std::shared_ptr<Context> *ctx = static_cast<std::shared_ptr<Context> *>(comm);
+  std::shared_ptr<gloo::Context> *ctx = static_cast<std::shared_ptr<gloo::Context> *>(comm);
   auto &pair = (*ctx)->getPair(peer);
   auto sendBuf = pair->createSendBuffer(tag, (void *)send_buf, size);
   auto recvBuf = pair->createRecvBuffer(tag, (void *)recv_buf, size);
@@ -20,5 +18,3 @@ int ring_exchange(void *comm, volatile void *send_buf, volatile void *recv_buf,
   sendBuf->waitSend();
   recvBuf->waitRecv();
 }
-
-} // namespace gloo
