@@ -54,6 +54,7 @@ public:
         pieceSize_(bytes_ / contextSize_),
         tag1(this->context_->nextSlot()),
         tag2(this->context_->nextSlot()),
+        comm((void *)&(this->context_)),
         fn_(fn)
   {
 
@@ -199,7 +200,7 @@ public:
     // Establish a connection with each peer
     uint32_t myRank = contextRank_;
 
-    rd_.pqp = new RingPair(sess, &ring_exchange, (void *)&(this->context_),
+    rd_.pqp = new RingPair(sess, &ring_exchange, comm,
                            myRank, contextSize_, tag1, tag2, mem_.tmpMem, ibv_ctx_);
     PCX_RING_PRINT("RC ring QPs created \n");
 
@@ -590,6 +591,9 @@ protected:
   // Used for out of band QPs exchange
   uint32_t tag1;
   uint32_t tag2;
+
+  // The struct that hold the communicator structure.
+  void* comm;
 };
 
 } // namespace gloo
