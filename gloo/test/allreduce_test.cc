@@ -586,7 +586,7 @@ INSTANTIATE_TEST_CASE_P(
                                                         // context size equals to 6 fails on data mismatch
                                                         // For supporting context size equals to 1 need to add "return" in the run()
                                                         // For supporting odd context size need to change the way QPs exchange information out of band. 
-        ::testing::ValuesIn(std::vector<int>({8,16,32})), // TODO: Need to add {64,1000}. Currently it fails on data mismatch // TODO: Need to add very small sizes like 1,2... Fails probably because of some integer devision that zerofies the number of bytes to reduce.
+        ::testing::ValuesIn(std::vector<int>({8,16,32})), // TODO: Need to add {64,1000}. Currently it fails on data mismatch // TODO: Need to add very small sizes like 1,2... Fails probably because of some integer devision that zerofies the number of bytes to reduce. // TODO: This parameter should be a multiplier of the context size parameter. Meaning cotnext size x can support only x,2x,3x etc. count size.
         ::testing::Values(allreducePcxRing),
         ::testing::Values(0), // Base
         ::testing::ValuesIn(std::vector<int>({1,2,3,4,5})))); // Times to run the algorithm // TODO: Need to add some large number of repeats
