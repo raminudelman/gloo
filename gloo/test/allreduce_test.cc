@@ -570,23 +570,22 @@ INSTANTIATE_TEST_CASE_P(
     RepeatAllreduceTest,
     ::testing::Combine(
         ::testing::ValuesIn(
-          // TODO: Make Ring work with all possible sizes of context (especially for a context of size == 1).
-          std::vector<int>({2, 4, 8, 16})), // TODO: King currently support only context size which is power of 2 (meaning 1,2,4,8, etc.). // TODO: Need to add {32}. Currently it fails on data mismatch
+          std::vector<int>({2, 4, 8, 16, 32, 64, 128})), // TODO: King currently support only context size which is power of 2 (meaning 1,2,4,8, etc.). // TODO: Add context size equals to 1. For supporting context size equals to 1 need to add "return" in the run().
         ::testing::ValuesIn(std::vector<int>({1, 64})), // TODO: Need to add {1000}. Currently it fails on data mismatch
         ::testing::Values(allreducePcxKing),
         ::testing::Values(0), // Base
-        ::testing::ValuesIn(std::vector<int>({1,2})))); // Times to run the algorithm. // TODO: Need to add {3,4,5} times too. Currently it fails on data mismatch
+        ::testing::ValuesIn(std::vector<int>({1,2,3,4,5})))); // Times to run the algorithm.
 
 INSTANTIATE_TEST_CASE_P(
     RepeatAllreducePcxRing,
     RepeatAllreduceTest,
     ::testing::Combine(
         // TODO: Make Ring work with all possible sizes of context (especially for a context of size == 1).
-        ::testing::ValuesIn(std::vector<int>({2,4,8})), //::testing::Range(2, 16,1), // Start, End, Step size // TODO: Need to odd numbers of context size and also some large numbers like 16,32...
+        ::testing::ValuesIn(std::vector<int>({2,4,8,16,32,64,128})), //::testing::Range(2, 16,1), // Start, End, Step size // TODO: Need to odd numbers of context size and also some large numbers like 16,32...
                                                         // context size equals to 6 fails on data mismatch
                                                         // For supporting context size equals to 1 need to add "return" in the run()
                                                         // For supporting odd context size need to change the way QPs exchange information out of band. 
-        ::testing::ValuesIn(std::vector<int>({8,16,32})), // TODO: Need to add {64,1000}. Currently it fails on data mismatch // TODO: Need to add very small sizes like 1,2... Fails probably because of some integer devision that zerofies the number of bytes to reduce. // TODO: This parameter should be a multiplier of the context size parameter. Meaning cotnext size x can support only x,2x,3x etc. count size.
+        ::testing::ValuesIn(std::vector<int>({128})), //({8,16,32})), // TODO: Need to add {64,1000}. Currently it fails on data mismatch // TODO: Need to add very small sizes like 1,2... Fails probably because of some integer devision that zerofies the number of bytes to reduce. // TODO: This parameter should be a multiplier of the context size parameter. Meaning cotnext size x can support only x,2x,3x etc. count size.
         ::testing::Values(allreducePcxRing),
         ::testing::Values(0), // Base
         ::testing::ValuesIn(std::vector<int>({1,2,3,4,5})))); // Times to run the algorithm // TODO: Need to add some large number of repeats
