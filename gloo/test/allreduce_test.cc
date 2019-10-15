@@ -537,10 +537,10 @@ TEST_F(AllreduceNewTest, TestTimeout) {
 
 
 using RepeatParam = std::tuple<int, int, std::function<Func>, int, int>;
-class RepeatAllreduceTest : public BaseTest,
+class AllreducePersistentTest : public BaseTest,
                       public ::testing::WithParamInterface<RepeatParam> {};
 
-TEST_P(RepeatAllreduceTest, RepeatSinglePointer) {
+TEST_P(AllreducePersistentTest, RepeatSinglePointer) {
   auto contextSize = std::get<0>(GetParam());
   auto dataSize = std::get<1>(GetParam());
   auto fn = std::get<2>(GetParam());
@@ -566,8 +566,8 @@ TEST_P(RepeatAllreduceTest, RepeatSinglePointer) {
 }
 
 INSTANTIATE_TEST_CASE_P(
-    RepeatAllreducePcxKing,
-    RepeatAllreduceTest,
+    AllreducePersistentPcxKingTest,
+    AllreducePersistentTest,
     ::testing::Combine(
         ::testing::ValuesIn(
           std::vector<int>({2, 4, 8, 16, 32, 64, 128})), // TODO: King currently support only context size which is power of 2 (meaning 1,2,4,8, etc.). // TODO: Add context size equals to 1. For supporting context size equals to 1 need to add "return" in the run().
@@ -577,8 +577,8 @@ INSTANTIATE_TEST_CASE_P(
         ::testing::ValuesIn(std::vector<int>({1,2,3,4,5})))); // Times to run the algorithm.
 
 INSTANTIATE_TEST_CASE_P(
-    RepeatAllreducePcxRing,
-    RepeatAllreduceTest,
+    AllreducePersistentPcxRingTest,
+    AllreducePersistentTest,
     ::testing::Combine(
         // TODO: Make Ring work with all possible sizes of context (especially for a context of size == 1).
         ::testing::ValuesIn(std::vector<int>({2,4,8,16,32,64,128})), //::testing::Range(2, 16,1), // Start, End, Step size // TODO: Need to odd numbers of context size and also some large numbers like 16,32...
