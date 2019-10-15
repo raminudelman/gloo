@@ -20,13 +20,13 @@ list(APPEND GLOO_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/types.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_ring.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_king.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/allreduce_alg_common.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/dv_mgr.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/qps.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_allreduce_alg_common.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_dv_mgr.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_qps.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_ring_qp.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_mem.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/verbs_ctx.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/comm_graph.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_verbs_ctx.cc"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_comm_graph.cc"
 
   )
 
@@ -41,7 +41,6 @@ list(APPEND GLOO_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/allreduce_local.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/allreduce_ring.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/allreduce_ring_chunked.h"
-
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_king.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_ring.h"
 
@@ -59,16 +58,13 @@ list(APPEND GLOO_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/scatter.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/types.h"
 
-  "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_king.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_ring.h"
-
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/dv_mgr.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/qps.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_dv_mgr.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_qps.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_ring_qp.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_mem.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/verbs_ctx.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/udma_barrier.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/comm_graph.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_verbs_ctx.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_udma_barrier.h"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_comm_graph.h"
   )
 
 if(USE_CUDA)

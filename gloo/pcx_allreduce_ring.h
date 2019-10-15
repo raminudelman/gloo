@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "third-party/pcx/allreduce_alg_chunked_ring.h"
+#include "third-party/pcx/pcx_allreduce_alg_chunked_ring.h"
 
 #include "gloo/algorithm.h"
 #include "gloo/context.h"
