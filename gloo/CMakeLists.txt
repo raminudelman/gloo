@@ -20,7 +20,6 @@ list(APPEND GLOO_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/types.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_ring.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_king.cc"
-
   )
 
 list(APPEND GLOO_HDRS
@@ -50,7 +49,6 @@ list(APPEND GLOO_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/reduce_scatter.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/scatter.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/types.h"
-
   )
 
 if(USE_CUDA)
@@ -85,7 +83,6 @@ add_subdirectory(transport)
 
 # Depend on pthreads for transport device threads
 list(APPEND gloo_DEPENDENCY_LIBS pthread)
-
 
 # Enable the following to get a list of source files
 if(FALSE)
