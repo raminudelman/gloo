@@ -20,14 +20,6 @@ list(APPEND GLOO_SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/types.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_ring.cc"
   "${CMAKE_CURRENT_SOURCE_DIR}/pcx_allreduce_king.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_allreduce_alg_common.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_dv_mgr.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_qps.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_ring_qp.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_king_qp.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_mem.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_verbs_ctx.cc"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_comm_graph.cc"
 
   )
 
@@ -59,14 +51,6 @@ list(APPEND GLOO_HDRS
   "${CMAKE_CURRENT_SOURCE_DIR}/scatter.h"
   "${CMAKE_CURRENT_SOURCE_DIR}/types.h"
 
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_dv_mgr.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_qps.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_ring_qp.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_king_qp.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_mem.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_verbs_ctx.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_udma_barrier.h"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../third-party/pcx/pcx_comm_graph.h"
   )
 
 if(USE_CUDA)

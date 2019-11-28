@@ -18,22 +18,19 @@ endif()
 
 if(USE_IBVERBS)
   find_package(ibverbs REQUIRED)
-  find_package(mlx5 REQUIRED)
   if(IBVERBS_FOUND)
     include_directories(SYSTEM ${IBVERBS_INCLUDE_DIRS})
     list(APPEND gloo_DEPENDENCY_LIBS ${IBVERBS_LIBRARIES})
-
     message(INFO " ibverbs lib: ${IBVERBS_LIBRARIES} ibverbs include: ${IBVERBS_INCLUDE_DIRS}  ")
-    include_directories(SYSTEM ${MLX5_INCLUDE_DIRS})
-    list(APPEND gloo_DEPENDENCY_LIBS ${MLX5_LIBRARIES} )
-    message(INFO " mlx5 lib: ${MLX5_LIBRARIES} mlx5 include: ${MLX5_INCLUDE_DIRS}  ")
-
-
   else()
     message(WARNING "Not compiling with ibverbs support. Suppress this warning with -DUSE_IBVERBS=OFF.")
     set(USE_IBVERBS OFF)
   endif()
 endif()
+
+add_subdirectory(./third-party/pcx)
+list(APPEND gloo_DEPENDENCY_LIBS pcx)
+include_directories(${PROJECT_SOURCE_DIR}/third-party/pcx/include)
 
 if(USE_MPI)
   find_package(MPI)

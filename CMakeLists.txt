@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.12 FATAL_ERROR)
 
 project(gloo CXX C)
 
-
+# TODO: Check why Yaniv added this? only in order to fail on the first error?
 add_definitions(
     -Wfatal-errors
     )

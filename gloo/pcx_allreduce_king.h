@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include "third-party/pcx/pcx_allreduce_alg_king.h"
+#include <pcx_allreduce_alg_king.h>
 
 #include <alloca.h>
 #include <stddef.h>
