@@ -16,8 +16,8 @@
 #include "gloo/cuda_allreduce_halving_doubling.h"
 #include "gloo/cuda_allreduce_halving_doubling_pipelined.h"
 #include "gloo/cuda_allreduce_ring_chunked.h"
-#include "gloo/pcx_allreduce_ring.h"
-#include "gloo/pcx_allreduce_king.h"
+#include "gloo/pcx_allreduce_ring.h" // TODO: Rami: Check if need to import "gloo/cuda_pcx_allreduce_ring.h"
+#include "gloo/pcx_allreduce_king.h" // TODO: Rami: Check if need to import "gloo/cuda_pcx_allreduce_king.h"
 #include "gloo/cuda_broadcast_one_to_all.h"
 #include "gloo/cuda_private.h"
 
@@ -178,7 +178,6 @@ template <typename T>
 void runBenchmark(options& x) {
   Runner::BenchmarkFn<T> fn;
 
-
   if (x.benchmark == "cuda_broadcast_one_to_all") {
     fn = [&x](std::shared_ptr<Context>& context) {
       return std::unique_ptr<Benchmark<T>>(
@@ -219,7 +218,7 @@ void runBenchmark(options& x) {
         new CudaAllreduceBenchmark<T, PcxAllreduceKing<T>>(context, x));
     };
   }
-  
+
   if (!fn) {
     GLOO_ENFORCE(false, "Invalid algorithm: ", x.benchmark);
   }
