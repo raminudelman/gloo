@@ -27,9 +27,9 @@ if(USE_IBVERBS)
   endif()
 endif()
 
-add_subdirectory(./third-party/pcx)
+add_subdirectory(${PROJECT_SOURCE_DIR}/third-party/pcx)
 list(APPEND gloo_DEPENDENCY_LIBS pcx)
-include_directories(${PROJECT_SOURCE_DIR}/third-party/pcx/include)
+include_directories(${PROJECT_SOURCE_DIR}/third-party/pcx/include/pcx)
 
 if(USE_MPI)
   find_package(MPI)
